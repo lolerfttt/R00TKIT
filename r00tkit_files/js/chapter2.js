@@ -276,20 +276,31 @@ function stepName(op){
 function help(){
   out('ГЛАВА 2 · КОМАНДЫ', 'head');
   out('');
+  out('ЦЕЛИ', 'head');
   out('  targets              список людей', '');
   out('  dossier <id>         досье цели', '');
+  out('');
+  out('ОПЕРАЦИЯ', 'head');
   out('  op <id>              начать операцию', '');
   out('  jobs                 текущая операция', '');
   out('  phish | social | hack | bribe   доступ', '');
   out('  copy accounts|messages|evidence|all   поиск', '');
-  out('  leak press|police|leek · sell       слив', '');
   out('  cover                замести следы ($250)', '');
-  out('  trust                доверие', '');
-  out('  skills · learn <метод>   навыки', '');
-  out('  leek                 связь с cyber_leek', '');
-  out('  status, mail, clear, save, reset', '');
   out('');
-  out('  hack — теперь метод доступа, а не фарм.', 'dim');
+  out('СЛИВ', 'head');
+  out('  leak press|police|leek   отдать данные', '');
+  out('  sell                 продать на сторону (-Trust)', '');
+  out('');
+  out('РАЗВИТИЕ И СВЯЗЬ', 'head');
+  out('  trust                текущее доверие', '');
+  out('  skills               навыки', '');
+  out('  learn <метод>        потратить очко навыка', '');
+  out('  leek                 связаться с cyber_leek', '');
+  out('  status               состояние', '');
+  out('  mail                 почта', '');
+  out('');
+  out('ФИНАЛ', 'head');
+  out('  stay | leave         решение после шести операций', '');
   out('');
 }
 
