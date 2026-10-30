@@ -520,7 +520,7 @@ function deliverMails(){
   while (S.mailNext < MAIL_CHAIN.length && S.earned >= MAIL_CHAIN[S.mailNext].at){
     const m = MAIL_CHAIN[S.mailNext];
     S.mailNext++;
-    S.mails.push({ id: 'm' + S.mailNext, from: 'unknown', subject: m.subject, body: m.body, read: false });
+    addMail({ id: 'm' + S.mailNext, from: 'unknown', subject: m.subject, body: m.body, read: false });
     out('');
     out('[MAIL] новое письмо · mail', 'ok');
     out('');
@@ -1156,7 +1156,7 @@ function hydrate(d){
   S.mails = Array.isArray(S.mails) ? S.mails.filter(m => m && typeof m === 'object') : [];
   // старые сейвы после катсцены: письмо с choice.exe не должно потеряться
   if (S.story > 0 && !S.choiceOpened && !S.mails.some(m => m.attachment === 'choice.exe')){
-    S.mails.push(choiceMail());
+    addMail(choiceMail(), false);
   }
   S.choiceOpened = !!S.choiceOpened;
   S.choiceResult = typeof S.choiceResult === 'string' ? S.choiceResult : '';
@@ -2025,7 +2025,8 @@ function startStory(force = false){
     if (S.story === 0){
       S.story = 1;
       S.mailRead = false;
-      S.mails = [choiceMail()];
+      S.mails = [];
+      addMail(choiceMail());
     }
     save(true);
     if (S.job) createJobLine();
@@ -2045,6 +2046,17 @@ function hasChoiceLetter(){
 function storyMail(subject, body, attachment = ''){
   const m = { id: 'm' + Date.now() + '-' + randInt(100, 999), from: 'unknown', subject, body, read: false };
   if (attachment) m.attachment = attachment;
+  return m;
+}
+
+function mailNote(m){
+  const extra = m.attachment ? `\nвложение: ${m.attachment}` : '';
+  note(`НОВОЕ ПИСЬМО\n${m.from || 'unknown'} · ${m.subject || '(без темы)'}${extra}\nпроверь: mail`, 'ok', 16000);
+}
+
+function addMail(m, notify = true){
+  S.mails.push(m);
+  if (notify) mailNote(m);
   return m;
 }
 
@@ -2136,7 +2148,7 @@ function choiceJoin(){
   lockChoice('join', 'ally');
   S.flags.joined = true;
   S.rareIn = 20;
-  S.mails.push(storyMail(
+  addMail(storyMail(
     'инструктаж',
     'выбор принят. ты в команде.\nпервое правило: не спрашивай, кто мы.\nвторое: не выключай терминал надолго.\nзадание придёт в почту.'
   ));
@@ -2187,7 +2199,7 @@ function choiceCrackWin(){
   S.flags.backdoor = true;
   S.heat = Math.min(100, S.heat + 15);
   S.rareIn = 5;
-  S.mails.push(storyMail(
+  addMail(storyMail(
     'ты вскрыл меня',
     'хорошо. это был тест, и ты его сдал.\nтеперь я знаю, что ты читаешь чужой код лучше, чем слушаешь чужие слова.\nbackdoor активен. я оставил его сам.\nследующий шаг ищи в targets.'
   ));
@@ -2207,7 +2219,7 @@ function choiceCrackFail(){
   choiceMode = 'done';
   lockChoice('crack', 'hunted');
   S.heat = Math.min(100, S.heat + 25);
-  S.mails.push(storyMail(
+  addMail(storyMail(
     'почти',
     'ты вскрыл файл, но не меня.\nстрока не совпала, и я это видел.\nнагрев +25%. продолжай в том же духе — и я приду первым.'
   ));
@@ -2796,7 +2808,8 @@ function cmdAdmin(args){
       S.tone = '';
       S.finished = '';
       S.flags = { backdoor:false, joined:false };
-      S.mails = [choiceMail()];
+      S.mails = [];
+      addMail(choiceMail(), false);
       save(true);
       out('[ADMIN] письмо choice.exe доставлено. open choice.exe', 'ok');
       if ((args[1] || '').toLowerCase() === 'open'){
