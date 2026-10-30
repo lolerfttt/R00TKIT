@@ -28,6 +28,63 @@ const TARGETS = [
 
 const METHOD_NAMES = { phish:'фишинг', social:'соц. инженерия', hack:'технический взлом', bribe:'подкуп' };
 
+/* ---------- сеть: мелкие задания ---------- */
+
+const NET_NAMES = ['Виктор Ланской','Олег Круг','Марина Соболь','Аркадий Лис','Сергей Волк','Алиса Ветрова','Дмитрий Ким','Роман Барс'];
+const NET_NICKS = ['ghost_77','nullbyte','kira.exe','m4x','v0id','rootcat','n3on','saint'];
+const NET_SITES = ['bank-ural.ru','crypto-pay.io','forum.garage','market.dark','login-secure.tk','pastebin.cc','cloud-dump.net'];
+const NET_ORGS = ['банк «Урал»','картель «Ночь»','фонд «Доверие»','портал «Сеть»','логистика «Восток»'];
+
+const NET_POOLS = { name:NET_NAMES, nick:NET_NICKS, site:NET_SITES, org:NET_ORGS };
+
+const NET_TEMPLATES = [
+  { id:'s1', verb:'scan', text:'найти открытый профиль {name}' },
+  { id:'s2', verb:'scan', text:'найти инфу про хакера {nick}' },
+  { id:'s3', verb:'scan', text:'проверить утечку {site}' },
+  { id:'s4', verb:'scan', text:'собрать архив по {name}' },
+  { id:'s5', verb:'scan', text:'найти докс на {name}' },
+  { id:'s6', verb:'scan', text:'найти след {nick} в {site}' },
+  { id:'s7', verb:'scan', text:'снести тг-аккаунт {nick}' },
+  { id:'c1', verb:'check', text:'проверить уязвимость сайта {site}' },
+  { id:'c2', verb:'check', text:'проверить данные {name}' },
+  { id:'c3', verb:'check', text:'сверить базу {org}' },
+  { id:'c4', verb:'check', text:'проверить платежи {org}' },
+  { id:'c5', verb:'check', text:'проверить фишинговый домен {site}' },
+  { id:'c6', verb:'check', text:'проверить слив базы {org}' },
+  { id:'c7', verb:'check', text:'проверить адрес {name}' },
+  { id:'f1', verb:'confirm', text:'подтвердить личность {name}' },
+  { id:'f2', verb:'confirm', text:'подтвердить утечку {site}' },
+  { id:'f3', verb:'confirm', text:'подтвердить адрес {name}' },
+  { id:'f4', verb:'confirm', text:'подтвердить связь {name} и {org}' },
+  { id:'f5', verb:'confirm', text:'дефнуть от доксеров {name}' },
+  { id:'f6', verb:'confirm', text:'перевести деньги {nick} на благотворительность' },
+  { id:'f7', verb:'confirm', text:'подтвердить слив {site}' }
+];
+
+function pickFrom(list){ return list[Math.floor(Math.random() * list.length)]; }
+
+function makeNetTask(verb, c){
+  const pool = NET_TEMPLATES.filter(t => t.verb === verb);
+  const seen = Array.isArray(c.netSeen) ? c.netSeen : [];
+  let available = pool.filter(t => !seen.includes(t.id));
+  if (!available.length) available = pool;
+  const tpl = pickFrom(available);
+  seen.push(tpl.id);
+  while (seen.length > 8) seen.shift();
+  c.netSeen = seen;
+  const title = tpl.text.replace(/\{(\w+)\}/g, (_, key) => pickFrom(NET_POOLS[key] || ['—']));
+  return {
+    verb,
+    tpl: tpl.id,
+    title,
+    trust: 1 + Math.floor(Math.random() * 3),
+    money: 5 + Math.floor(Math.random() * 26),
+    duration: 3 + Math.floor(Math.random() * 4)
+  };
+}
+
+let netLineEl = null;
+
 /* ---------- состояние ---------- */
 
 let pendingEscape = false;
@@ -48,6 +105,12 @@ function ensure(){
   if (!Array.isArray(c.completed)) c.completed = [];
   if (!c.closed || typeof c.closed !== 'object') c.closed = {};
   if (!c.extra || typeof c.extra !== 'object') c.extra = {};
+  if (!Array.isArray(c.netSeen)) c.netSeen = [];
+  if (!c.netTasks || typeof c.netTasks !== 'object') c.netTasks = {};
+  for (const v of ['scan', 'check', 'confirm']){
+    if (!c.netTasks[v] || typeof c.netTasks[v] !== 'object' || !c.netTasks[v].title) c.netTasks[v] = makeNetTask(v, c);
+  }
+  if (!c.netJob || typeof c.netJob !== 'object') c.netJob = null;
   if (typeof c.introSeen !== 'boolean') c.introSeen = false;
   if (!c.op || typeof c.op !== 'object') c.op = null;
   if (typeof c.ended !== 'boolean') c.ended = false;
@@ -156,6 +219,7 @@ function prisonEnding(){
 async function enterChapter2(){
   pendingEscape = false;
   socialPick = false;
+  netLineEl = null;
   const old = state();
   const nick = old.nick || Core.readNick();
   const next = Core.newState();
@@ -253,7 +317,7 @@ function start(){
   out(`  $${fmt(s.money)} · доверие ${Math.round(c.trust)} · операций ${c.done}`, '');
   out('');
   out('  targets — цели · op <id> — операция · jobs — текущая', 'dim');
-  out('  help — все команды · trust — доверие', 'dim');
+  out('  net — задания сети для Trust · help — все команды', 'dim');
   out('');
   if (c.ended) out('  история главы 2 завершена.', 'dim');
   Core.setTask(c.op ? `операция: ${targetById(c.op.id)?.name || 'цель'} · ${stepName(c.op)}` : 'выбери цель: targets');
@@ -293,6 +357,8 @@ function help(){
   out('');
   out('РАЗВИТИЕ И СВЯЗЬ', 'head');
   out('  trust                текущее доверие', '');
+  out('  net                  задания сети (+1–3 trust)', '');
+  out('  net scan|check|confirm   взять задание', '');
   out('  skills               навыки', '');
   out('  learn <метод>        потратить очко навыка', '');
   out('  leek                 связаться с cyber_leek', '');
@@ -315,7 +381,7 @@ function cmdTargets(c){
     let status = '';
     if (done) status = 'закрыто';
     else if (closed) status = 'в тени · ' + Core.fmtTime(Math.ceil((c.closed[t.id] - Date.now()) / 1000));
-    else if (locked) status = 'нужно доверие ' + t.minTrust;
+    else if (locked) status = 'нужно доверие ' + t.minTrust + ' · net';
     out(`  [${t.id}] ${t.name} · ${t.role} · ${stars(t.stars)} · $${fmt(t.reward)} · +${t.trust} trust`, done ? 'dim' : '');
     out(`       ищем: ${t.need}${status ? ' · ' + status : ''}`, 'dim');
   }
@@ -345,7 +411,7 @@ function cmdOp(c, id){
   if (c.completed.includes(t.id)){ out(`${t.name}: цель уже закрыта.`, 'dim'); return; }
   const until = c.closed[t.id] || 0;
   if (until > Date.now()){ out(`${t.name} в тени ещё ${Core.fmtTime(Math.ceil((until - Date.now()) / 1000))}.`, 'dim'); return; }
-  if (c.trust < t.minTrust){ out(`нужно доверие ${t.minTrust}. сейчас ${Math.round(c.trust)}.`, 'err'); return; }
+  if (c.trust < t.minTrust){ out(`нужно доверие ${t.minTrust}. сейчас ${Math.round(c.trust)}. используй net — задания сети.`, 'err'); return; }
   c.op = { id:t.id, step:'access', progress:15, risk:t.risk, fails:0, hardened:false };
   out('');
   out(`ОПЕРАЦИЯ · ${t.name}`, 'head');
@@ -662,6 +728,83 @@ function cmdCover(c){
   Core.updateBadges();
 }
 
+/* ---------- сеть: задания ---------- */
+
+function netMenu(c){
+  out('ПОМОЩЬ СЕТИ · cyber_leek', 'head');
+  out('  мелкие задания информаторов: +1–3 trust и немного денег.', 'dim');
+  out('');
+  if (c.netJob){
+    const job = c.netJob;
+    const p = clamp((Date.now() - (job.startedAt || Date.now())) / (job.duration * 1000), 0, 1);
+    out(`  выполняется: ${job.title}`, '');
+    out(`  ${bar(p)} ${Math.floor(p * 100)}%`, 'dim');
+    out('');
+    return;
+  }
+  for (const verb of ['scan', 'check', 'confirm']){
+    const t = c.netTasks[verb];
+    out(`  net ${verb.padEnd(7)} ${t.title}`, '');
+    out(`             +${t.trust} trust · $${t.money} · ~${t.duration}с`, 'dim');
+  }
+  out('');
+  out('  net scan | net check | net confirm — взять задание', 'dim');
+  out('');
+}
+
+function startNet(c, verb){
+  if (c.ended){ out('история завершена.', 'dim'); return; }
+  if (c.netJob){ out('сначала дождись текущего задания сети. jobs — статус.', 'dim'); return; }
+  const task = c.netTasks[verb];
+  if (!task){ out('net scan | net check | net confirm', 'err'); return; }
+  c.netJob = Object.assign({}, task, { startedAt: Date.now() });
+  out('');
+  out(`[NET] ${task.title}`, '');
+  netLineEl = Core.out('', 'job');
+  Core.setTask(`сеть: ${task.title}`);
+  Core.save();
+  netTick(c);
+}
+
+function netTick(c){
+  const job = c.netJob;
+  if (!job) return;
+  if (!job.startedAt) job.startedAt = Date.now();
+  if (!netLineEl || !netLineEl.isConnected) netLineEl = Core.out('', 'job');
+  const p = clamp((Date.now() - job.startedAt) / (job.duration * 1000), 0, 1);
+  if (netLineEl) netLineEl.textContent = `  ${job.title} ${bar(p)} ${Math.floor(p * 100)}%`;
+  if (p >= 1) finishNet(c, job);
+}
+
+function finishNet(c, job){
+  const s = state();
+  s.money += job.money;
+  c.trust = clamp(c.trust + job.trust, 0, 100);
+  c.netDone = (c.netDone || 0) + 1;
+  c.netTasks[job.verb] = makeNetTask(job.verb, c);
+  c.netJob = null;
+  if (netLineEl){
+    netLineEl.className = 'line ok';
+    netLineEl.textContent = `  [+] ${job.title} · +${job.trust} trust · +$${fmt(job.money)}`;
+    netLineEl = null;
+  }
+  out(`[NET] готово · доверие ${Math.round(c.trust)} · деньги $${fmt(s.money)}`, 'dim');
+  out('');
+  Core.setTask('сеть: net · цели: targets');
+  Core.save();
+  Core.updateBadges();
+}
+
+function cmdNet(c, arg){
+  const verb = String(arg || '').toLowerCase();
+  if (!verb){ netMenu(c); return; }
+  if (verb !== 'scan' && verb !== 'check' && verb !== 'confirm'){
+    out('net scan | net check | net confirm', 'dim');
+    return;
+  }
+  startNet(c, verb);
+}
+
 function cmdStatus(c){
   out('СИСТЕМА · ГЛАВА 2', 'head');
   out('  локация   ТИХАЯ КОМНАТА', '');
@@ -671,6 +814,7 @@ function cmdStatus(c){
   out(`  навыки    очков ${c.sp}`, 'dim');
   if (c.op) out(`  текущая   ${targetById(c.op.id)?.name || '—'} · ${stepName(c.op)} · ${c.op.progress}%`, '');
   else out('  текущая   нет', 'dim');
+  if (c.netJob) out(`  сеть      ${c.netJob.title}`, '');
   out('');
 }
 
@@ -709,6 +853,7 @@ function cmdLeave(c){
 function adminExit(){
   pendingEscape = false;
   socialPick = false;
+  netLineEl = null;
   const old = state();
   const nick = old.nick || Core.readNick();
   const next = Core.newState();
@@ -785,6 +930,7 @@ function handle(cmd, args, line){
     case 'jobs': cmdJobs(c); return true;
     case 'status': cmdStatus(c); return true;
     case 'trust': cmdTrust(c); return true;
+    case 'net': cmdNet(c, args[0]); return true;
     case 'skills': cmdSkills(c); return true;
     case 'learn': cmdLearn(c, args[0]); return true;
     case 'leek': cmdLeek(c); return true;
@@ -820,7 +966,7 @@ function handle(cmd, args, line){
 
 window.GarageChapter2 = {
   handle,
-  tick(){ ensure(); },
+  tick(){ const c = ensure(); if (c) netTick(c); },
   tickChapter1,
   menu,
   start,

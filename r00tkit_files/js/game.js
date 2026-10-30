@@ -1804,7 +1804,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v1.0'),
+  artLine('prod by 3percent · v1.1'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
