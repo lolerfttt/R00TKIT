@@ -97,7 +97,8 @@
     sfx[name] = makeAudio('sounds/sfx/' + encodeURIComponent(file));
   }
   for (const [name, file] of Object.entries(MUSIC_FILES)){
-    music[name] = makeAudio('sounds/music/' + encodeURIComponent(file), true);
+    // menu и scene играют по кругу; остальные — как плейлист, с автопереходом
+    music[name] = makeAudio('sounds/music/' + encodeURIComponent(file), name === 'menu' || name === 'scene');
   }
 
   const gains = Object.fromEntries(Object.keys(music).map(n => [n, 0]));
@@ -185,6 +186,24 @@
         targetName = null;
       }
     }, 40);
+  }
+
+  // трек закончился — переходим к следующему из видимого плейлиста
+  function autoNext(id){
+    if (desiredName !== id) return;
+    const list = visibleTracks();
+    let i = list.findIndex(t => t.id === id);
+    if (i < 0) return;
+    const next = list[(i + 1) % list.length].id;
+    if (next === id){ startTrack(id); return; }
+    if (manualTrack) manualTrack = next;
+    desiredName = next;
+    setTrackLabel(next);
+    fadeTo(next, 500);
+  }
+
+  for (const id of ['gameplay', 'hunting', 'double_cash']){
+    music[id].addEventListener('ended', () => autoNext(id));
   }
 
   function unlock(){
