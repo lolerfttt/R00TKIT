@@ -394,7 +394,7 @@ function note(text, cls = '', ms = 14000){
 function rareActive(){ return !!S.rare; }
 
 function spawnRare(){
-  if (S.rare || cutscene.active || transitioning || panic || !booted) return false;
+  if (S.rare || cutscene.active || transitioning || panic || !booted || tutActive()) return false;
   const base = bestTarget();
   const mult = randRange(BAL.rareMult);
   const life = Math.round(randRange(BAL.rareLife));
@@ -1255,20 +1255,22 @@ function tick(){
       }
     }
 
-    if (S.heat >= 100) raid();
+    if (S.heat >= 100 && !tutActive()) raid();
 
-    deliverMails();
+    if (!tutActive()) deliverMails();
 
     if (S.rare){
       if (Date.now() >= S.rare.expires) rareExpire();
-    } else if (!panic){
+    } else if (!panic && !tutActive()){
       S.rareIn -= dt;
       if (S.rareIn <= 0) spawnRare();
     }
 
-    S.offerIn -= dt;
-    if (S.offerIn <= 0) rollOffers();
-    if (!panic){
+    if (!tutActive()){
+      S.offerIn -= dt;
+      if (S.offerIn <= 0) rollOffers();
+    }
+    if (!panic && !tutActive()){
       S.eventIn -= dt;
       if (S.eventIn <= 0){ teamEvent(); S.eventIn = randRange(BAL.eventIn); }
     }
@@ -1553,6 +1555,10 @@ function startTutorial(){
   S.tutorialDone = false;
   S.tutorialStep = 1;
   S.money = Math.max(S.money, 300);
+  S.rare = null;
+  S.rareIn = randRange(BAL.rareIn);
+  S.offerIn = randRange(BAL.offerIn);
+  S.eventIn = randRange(BAL.eventIn);
   out('');
   out('  [ОБУЧЕНИЕ]', 'head');
   out('  ты в гараже. есть ноутбук, $300 и ни одного следа.', '');
@@ -1564,6 +1570,8 @@ function startTutorial(){
 }
 
 function resumeTutorial(){
+  S.rare = null;
+  S.rareIn = randRange(BAL.rareIn);
   if (S.tutorialStep >= 7){
     out('  обучение продолжается. тревога ещё не снята.', 'err');
     startPanic();
