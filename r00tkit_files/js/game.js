@@ -2441,9 +2441,10 @@ function buyRig(n){
 function matchUpgrade(q){
   q = String(q || '').toLowerCase().trim();
   if (!q) return null;
-  let hits = UPGRADES.filter(u => u.id === q || u.name.toLowerCase() === q);
+  const tag = u => String(u.tag || '').toLowerCase();
+  let hits = UPGRADES.filter(u => u.id === q || u.name.toLowerCase() === q || tag(u) === q);
   if (hits.length === 1) return hits[0];
-  hits = UPGRADES.filter(u => u.id.startsWith(q) || u.name.toLowerCase().startsWith(q));
+  hits = UPGRADES.filter(u => u.id.startsWith(q) || u.name.toLowerCase().startsWith(q) || tag(u).startsWith(q));
   return hits.length === 1 ? hits[0] : null;
 }
 
@@ -2452,7 +2453,7 @@ function cmdBuy(args){
   const n = clamp(parseInt(args[1] || '1', 10) || 1, 1, 500);
   if (!id){
     sfx('ui_error');
-    out('укажи улучшение: ' + UPGRADES.map(u => u.name.toLowerCase()).join(', ') + ', риг', 'err');
+    out('укажи улучшение: ' + UPGRADES.map(u => (u.tag || u.id).toLowerCase()).join(', ') + ', риг', 'err');
     return;
   }
   if (id === 'rig' || id === 'риг'){ buyRig(n); return; }
