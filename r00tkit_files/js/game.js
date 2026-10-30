@@ -518,7 +518,7 @@ function choiceMail(){
     id: 'choice',
     from: 'unknown',
     subject: 'без темы',
-    body: 'ты дошёл. это уже ответ.\nвнутри — вопрос. ответишь один раз.\nоткрыть вложение: open choice.exe',
+    body: 'ты дошёл. это уже ответ.\nвнутри — вопрос. ответишь один раз.',
     attachment: 'choice.exe',
     read: false
   };
@@ -2452,6 +2452,7 @@ function renderMail(){
   }
   out('');
   out('  mail clear — очистить почту · письма с вложениями не удаляются', 'dim');
+  if (hasChoiceLetter()) out('  открыть вложение: open choice.exe', 'white');
   out('');
 }
 

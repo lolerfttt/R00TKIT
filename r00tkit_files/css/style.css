@@ -50,6 +50,7 @@
   #log::-webkit-scrollbar-track{background:transparent;}
   .line{white-space:pre-wrap;overflow-wrap:anywhere;min-height:1.4em;}
   .dim{color:var(--g-dim);text-shadow:none;}
+  .white{color:#fff;text-shadow:none;}
   .menu-sep{color:#1d8f45;letter-spacing:2px;text-shadow:none;}
   .ok{color:var(--g-bright);}
 .freeze-head{color:#ff5a5a;letter-spacing:2px;text-shadow:0 0 12px rgba(255,0,0,.55);}
@@ -80,18 +81,7 @@
   body.cutscene #notes{display:none;}
 
   /* ---------- значки-напоминания ---------- */
-  .icon{
-    display:block;width:22px;height:22px;
-    background:currentColor;
-    -webkit-mask:var(--m) center/contain no-repeat;
-    mask:var(--m) center/contain no-repeat;
-  }
-  .icon-mail{--m:url(../icons/mail.svg);}
-  .icon-skill{--m:url(../icons/skill_point.svg);}
-  .icon-team-plus{--m:url(../icons/team_plus.svg);}
-  .icon-team-warning{--m:url(../icons/team_warning.svg);}
-  .icon-anonymous{--m:url(../icons/anonymous.svg);}
-  .icon-signal{--m:url(../icons/signal.svg);}
+  .icon{display:block;width:22px;height:22px;flex:0 0 auto;}
 
   #netbadge{
     position:fixed;left:14px;top:9px;z-index:85;

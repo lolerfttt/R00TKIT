@@ -37,7 +37,7 @@ R00TKIT.html              разметка, запускать этот файл
 r00tkit_files/            всё остальное
   README.md               этот файл
   css/style.css           стили, CRT-эффект, интро
-  icons/                  svg-значки-напоминания
+  icons/                  исходные svg-значки (встроены в R00TKIT.html)
   js/game.js              игровая логика
   js/intro.js             сценарий интро (ник, логин, пароль)
   js/nick.js              ник и leet-превращение
