@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<base href="r00tkit_files/">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R00TKIT</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="log"></div>
+  <div id="hud">
+    <span class="v" id="h-loc">ГАРАЖ</span>
+    <span class="sep">│</span>
+    <span class="v" id="h-money">$0</span>
+    <span class="sep">│</span>
+    <span id="h-inc">+$0/с</span>
+    <span class="sep">│</span>
+    <span id="h-lvl">LVL 1</span>
+    <span class="sep">│</span>
+    <span id="h-xp">XP 0%</span>
+    <span class="sep">│</span>
+    <span id="h-heat">H 0%</span>
+  </div>
+  <div id="task" hidden></div>
+  <div id="notes" aria-live="polite"></div>
+  <div id="inputline">
+    <span id="prompt">root@garage:~$</span>
+    <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="команда">
+    <div id="volume" title="громкость">
+      <span class="vol-label">VOL</span>
+      <input id="vol" type="range" min="0" max="100" step="1" value="75" aria-label="громкость звука">
+      <span id="vol-val">75</span>
+    </div>
+    <div id="player" title="плеер">
+      <button id="tr-prev" type="button" tabindex="-1" aria-label="предыдущий трек">‹</button>
+      <span id="tr-name">3percent - light lab</span>
+      <button id="tr-next" type="button" tabindex="-1" aria-label="следующий трек">›</button>
+    </div>
+  </div>
+</div>
+
+<div id="hints" class="off" aria-hidden="true">
+  <div class="hints-title">КОМАНДЫ</div>
+  <div class="hint" data-cmd="hack"><b>hack</b><span>взлом</span></div>
+  <div class="hint" data-cmd="shop"><b>shop</b><span>магазин</span></div>
+  <div class="hint" data-cmd="buy"><b>buy cpu</b><span>улучшение</span></div>
+  <div class="hint" data-cmd="rig"><b>rig</b><span>ферма</span></div>
+  <div class="hint" data-cmd="buy rig"><b>buy rig</b><span>риг</span></div>
+  <div class="hint" data-cmd="learn"><b>learn</b><span>навык</span></div>
+  <div class="hint" data-cmd="status"><b>status</b><span>статус</span></div>
+  <div class="hint" data-cmd="targets"><b>targets</b><span>цели</span></div>
+  <div class="hint" data-cmd="help"><b>help</b><span>всё</span></div>
+  <div class="hint wipe" data-cmd="wipe"><b>wipe</b><span>стереть</span></div>
+  <div class="hint" data-cmd="hints"><b>hints</b><span>скрыть</span></div>
+</div>
+
+<div id="panic" aria-hidden="true">
+  <div class="panic-inner">
+    <div class="panic-title" id="panic-title">ВАШЕ МЕСТОПОЛОЖЕНИЕ<br>ВЫЯВЛЕНО</div>
+    <div class="panic-sub" id="panic-sub">полиция уже в пути</div>
+    <div class="panic-timer"><span id="panic-time">15</span><span class="unit">с</span></div>
+    <div class="panic-cmd" id="panic-cmd">введи: wipe</div>
+  </div>
+</div>
+
+<div id="choice" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="win-box">
+    <div class="win-title">
+      <span>C:\Windows\System32\cmd.exe</span>
+      <span class="win-btns" aria-hidden="true"><b>_</b><b>□</b><b>✕</b></span>
+    </div>
+    <div class="win-body" id="choice-log"></div>
+    <div class="win-input">
+      <span class="win-prompt" id="choice-prompt">C:\&gt;</span>
+      <input id="choice-cmd" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64" aria-label="ввод в окне choice.exe">
+    </div>
+  </div>
+</div>
+
+<div id="welcome" hidden role="dialog" aria-modal="true" aria-label="настройка звука">
+  <div class="welcome-title">R00TKIT</div>
+  <div class="welcome-sub">проверь громкость</div>
+  <div id="welcome-volume">
+    <span>VOL</span>
+    <input id="welcome-vol" type="range" min="0" max="100" step="1" value="75" aria-label="громкость">
+    <span id="welcome-vol-val">75</span>
+  </div>
+  <button id="welcome-go" type="button">продолжить</button>
+</div>
+
+<div id="intro" aria-hidden="false">
+  <div id="intro-log"></div>
+</div>
+
+<script src="js/nick.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/game.js"></script>
+<script src="js/intro.js"></script>
+<script>
+// страховка только на случай, если intro.js вообще не загрузился;
+// сам сценарий интро разруливает свои таймауты
+setTimeout(function(){
+  if (window.GarageIntro) return;
+  var app = document.getElementById('app');
+  if (app && !app.classList.contains('app-ready')) {
+    app.classList.add('app-ready');
+    var intro = document.getElementById('intro');
+    if (intro) { intro.classList.add('hide'); intro.style.display = 'none'; }
+    if (window.Garage && window.Garage.init) window.Garage.init();
+  }
+}, 5000);
+</script>
+</body>
+</html>

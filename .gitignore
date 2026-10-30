@@ -1,0 +1,6 @@
+﻿# локальные сейвы и бэкапы
+r00tkit-save.json
+_backup_*
+*.log
+Thumbs.db
+.DS_Store
