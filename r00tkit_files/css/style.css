@@ -28,7 +28,7 @@
   #app{
     position:fixed;inset:0;margin:0 auto;max-width:1040px;
     display:flex;flex-direction:column;
-    padding:38px 22px 14px;
+    padding:44px 22px 14px;
   }
   #hud{
     display:none;flex-wrap:wrap;gap:4px 12px;align-items:baseline;
@@ -81,7 +81,7 @@
   body.cutscene #notes{display:none;}
 
   /* ---------- значки-напоминания ---------- */
-  .icon{display:block;width:22px;height:22px;flex:0 0 auto;}
+  .icon{display:block;width:26px;height:26px;flex:0 0 auto;}
 
   #netbadge{
     position:fixed;left:14px;top:9px;z-index:85;
@@ -90,7 +90,7 @@
     filter:drop-shadow(0 0 5px rgba(51,255,119,.45));
   }
   #netbadge.on{display:flex;}
-  #netbadge .icon{width:20px;height:20px;}
+  #netbadge .icon{width:24px;height:24px;}
   #netbadge .signal{color:#33ff77;}
 
   #badges{
@@ -101,7 +101,7 @@
   #badges.on{display:flex;}
   .badge{display:none;color:#33ff77;}
   .badge.on{display:block;animation:badgeBlink 2.6s ease-in-out infinite;}
-  .badge .icon{width:24px;height:24px;}
+  .badge .icon{width:30px;height:30px;}
   .badge-mail{color:#8ad8ff;filter:drop-shadow(0 0 6px rgba(90,200,255,.55));}
   .badge-mail.on{animation-duration:3.4s;}
   .badge-team{filter:drop-shadow(0 0 6px rgba(51,255,119,.55));}
@@ -188,7 +188,7 @@
   }
   @media (max-width:700px){
     body{font-size:17px;}
-    #app{padding:30px 12px 10px;}
+    #app{padding:40px 12px 10px;}
     #hud{font-size:.72em;gap:3px 9px;}
     #log{padding-right:2px;}
   }
