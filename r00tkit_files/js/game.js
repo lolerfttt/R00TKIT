@@ -27,6 +27,11 @@ const panicEl = $('panic');
 const choiceEl = $('choice');
 const choiceLog = $('choice-log');
 const choiceInput = $('choice-cmd');
+const badgeMail = $('badge-mail');
+const badgeTeam = $('badge-team');
+const badgeSkill = $('badge-skill');
+const badgesEl = $('badges');
+const netBadge = $('netbadge');
 
 const STAGES = [
   { name:'ГАРАЖ',       host:'garage',  cost:0,        mult:1,   slots:1,  lore:'бетон, паяльник и один ноут.' },
@@ -207,7 +212,7 @@ function newState(){
     skills:{ speed:0, profit:0, stealth:0, auto:0 },
     up:{ cpu:0, ram:0, gpu:0, vpn:0, bot:0, ai:0 },
     job:null, admin:false, god:false, lastSave:Date.now(),
-    phraseIn:20 + Math.floor(Math.random() * 11), phrase:null,
+    phraseIn:20 + Math.floor(Math.random() * 11), phrase:null, firstSeed:true,
     checkIn:18 + Math.floor(Math.random() * 9), checkAt:0,
     rare:null, rareIn:120 + Math.floor(Math.random() * 120),
     crew:[], offers:[], offerIn:60 + Math.floor(Math.random() * 60),
@@ -216,7 +221,7 @@ function newState(){
     mails:[], mailNext:0,
     story:0, mailRead:false, choiceOpened:false, choiceResult:'', choiceAt:0,
     tone:'', finished:'', flags:{ backdoor:false, joined:false },
-    tutorialDone:false, tutorialStep:0, showHints:false,
+    tutorialDone:false, tutorialStep:0, showHints:false, teamAlert:false,
     nick:readNick()
   };
 }
@@ -243,6 +248,8 @@ let transitioning = false;
 let choiceMode = null;
 let choiceTimer = null;
 let choiceSeq = '';
+let choiceCanClose = false;
+let choiceCloseTimer = null;
 
 const cutscene = { active:false, token:0, nickTimer:null };
 /* ─── СКОРОСТЬ КАТСЦЕНЫ ─── */
@@ -498,6 +505,7 @@ function teamEvent(){
     out('');
     note(`TEAM · ${m.name} задержан\nнагрев +18% · проверь team`, 'warn', 16000);
   }
+  if (r >= 0.32) S.teamAlert = true;
   S.team = S.crew.length;
   refreshLiveMenu();
   save(true);
@@ -510,7 +518,7 @@ function choiceMail(){
     id: 'choice',
     from: 'unknown',
     subject: 'без темы',
-    body: 'ты дошёл. это уже ответ.\nвнутри — вопрос. ответишь один раз.',
+    body: 'ты дошёл. это уже ответ.\nвнутри — вопрос. ответишь один раз.\nоткрыть вложение: open choice.exe',
     attachment: 'choice.exe',
     read: false
   };
@@ -1164,10 +1172,12 @@ function hydrate(d){
   S.tone = typeof S.tone === 'string' ? S.tone : '';
   S.finished = typeof S.finished === 'string' ? S.finished : '';
   S.flags = Object.assign({ backdoor:false, joined:false }, d && d.flags || {});
+  S.teamAlert = !!(d && d.teamAlert);
   if (S.choiceResult) S.choiceOpened = true;
   S.phraseIn = (isFinite(Number(S.phraseIn)) && Number(S.phraseIn) >= 0)
     ? Math.floor(Number(S.phraseIn))
     : rollPhraseIn();
+  S.firstSeed = !(d && d.firstSeed === false);
   if (S.phrase && Array.isArray(S.phrase.words) && S.phrase.words.length && isFinite(S.phrase.left)){
     S.phrase.words = S.phrase.words.map(w => String(w).toLowerCase());
     S.phrase.left = Math.max(0, Number(S.phrase.left));
@@ -1212,6 +1222,19 @@ function renderHUD(){
   $('h-xp').textContent = 'XP ' + Math.floor(clamp(S.xp / need, 0, 1) * 100) + '%';
   $('h-heat').textContent = 'H ' + Math.floor(S.heat) + '%';
   $('h-heat').classList.toggle('hot', S.heat >= 80);
+}
+
+function updateBadges(){
+  const on = booted && !cutscene.active && !panic;
+  if (badgesEl) badgesEl.classList.toggle('on', on);
+  if (netBadge) netBadge.classList.toggle('on', on);
+  if (badgeMail) badgeMail.classList.toggle('on', on && (S.mails || []).some(m => !m.read));
+  if (badgeTeam) {
+    const offers = on && (S.offers || []).length > 0 && S.crew.length < stage().slots;
+    badgeTeam.classList.toggle('on', offers || (on && !!S.teamAlert));
+    badgeTeam.classList.toggle('warn', on && !!S.teamAlert);
+  }
+  if (badgeSkill) badgeSkill.classList.toggle('on', on && S.points > 0);
 }
 
 /* ---------- игровой цикл ---------- */
@@ -1296,6 +1319,7 @@ function tick(){
   }
 
   renderHUD();
+  updateBadges();
 }
 
 function addXP(n){
@@ -1366,7 +1390,9 @@ function renderPhrase(clear){
 function freezeJob(){
   if (!S.job || S.job.frozen || S.phrase) return;
   S.job.frozen = true;
-  S.phrase = { words: makePhrase(), left: PHRASE_TIME, last: PHRASE_TIME };
+  const limit = S.firstSeed ? 30 : PHRASE_TIME;
+  S.phrase = { words: makePhrase(), left: limit, last: limit };
+  if (S.firstSeed){ S.firstSeed = false; save(true); }
   sfx('seed_glitch');
   renderPhrase(true);
   input.focus();
@@ -1758,7 +1784,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v0.1'),
+  artLine('prod by 3percent · v0.2'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
@@ -2092,7 +2118,9 @@ function openChoice(){
   choiceLog.innerHTML = '';
   choiceMode = 'menu';
   choiceSeq = '';
+  choiceCanClose = false;
   if (choiceTimer){ clearTimeout(choiceTimer); choiceTimer = null; }
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
   choiceInput.value = '';
   choiceInput.disabled = false;
   sfx('ui_open');
@@ -2157,7 +2185,7 @@ function choiceJoin(){
   winLine('> канал открыт. неизвестный больше не «unknown».', 'dim');
   winLine('> письмо с инструктажем уже в почте.', '');
   winLine('');
-  setTimeout(finishChoice, 1800);
+  armChoiceClose();
 }
 
 function choiceSurrender(){
@@ -2168,7 +2196,7 @@ function choiceSurrender(){
   winLine('> выбор принят: выход.', 'dim');
   winLine('> сессия закрывается. следы стираются сами.', 'dim');
   winLine('');
-  setTimeout(finishChoice, 1800);
+  armChoiceClose();
 }
 
 function choiceCrackStart(){
@@ -2210,7 +2238,7 @@ function choiceCrackWin(){
   winLine('> он теперь знает, что ты умеешь читать.', 'dim');
   winLine('');
   save(true);
-  setTimeout(finishChoice, 2200);
+  armChoiceClose();
 }
 
 function choiceCrackFail(){
@@ -2229,17 +2257,38 @@ function choiceCrackFail(){
   winLine('> нагрев +25%. издевательское письмо в почте.', 'dim');
   winLine('');
   save(true);
-  setTimeout(finishChoice, 2200);
+  armChoiceClose();
+}
+
+function armChoiceClose(){
+  choiceCanClose = false;
+  choiceInput.disabled = true;
+  choiceInput.blur();
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
+  choiceCloseTimer = setTimeout(() => {
+    choiceCloseTimer = null;
+    if (choiceMode !== 'done') return;
+    choiceCanClose = true;
+    choiceInput.disabled = false;
+    choiceInput.focus();
+    winLine('> нажми любую клавишу или кликни, чтобы закрыть.', 'dim');
+    winLine('');
+  }, 3000);
 }
 
 function finishChoice(){
+  if (choiceMode === null) return;
   if (choiceTimer){ clearTimeout(choiceTimer); choiceTimer = null; }
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
+  choiceCanClose = false;
   closeChoice();
   if (S.finished === 'surrender') renderFinal();
 }
 
 function closeChoice(){
   if (choiceTimer){ clearTimeout(choiceTimer); choiceTimer = null; }
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
+  choiceCanClose = false;
   choiceMode = null;
   if (choiceEl) choiceEl.classList.remove('on');
   if (choiceEl) choiceEl.setAttribute('aria-hidden', 'true');
@@ -2258,6 +2307,9 @@ function renderFinal(){
   booted = true;
   cutscene.active = false;
   choiceMode = null;
+  choiceCanClose = false;
+  if (choiceTimer){ clearTimeout(choiceTimer); choiceTimer = null; }
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
   if (choiceEl) choiceEl.classList.remove('on');
   document.body.classList.remove('choice-open', 'cutscene');
   clearConsole();
@@ -2352,12 +2404,14 @@ function renderTargets(){
   out(`ЦЕЛИ ВЗЛОМА · уровень ${lvl}`, 'head');
   out('');
   for (const t of list){
-    const line = `  > ${t.name.padEnd(17)} $${fmt(t.money).padEnd(7)} ${String(t.time).padStart(2)}с  +${t.xp}xp  H+${t.heat}`;
+    const reward = Math.round(t.money * hackRewardMult());
+    const line = `  > ${t.name.padEnd(17)} $${fmt(reward).padEnd(7)} ${String(t.time).padStart(2)}с  +${t.xp}xp  H+${t.heat}`;
     out(line);
   }
   if (S.rare){
     const left = Math.max(0, Math.ceil((S.rare.expires - Date.now()) / 1000));
-    out(`  > ${S.rare.name.padEnd(17)} $${fmt(S.rare.money).padEnd(7)} ${String(S.rare.time).padStart(2)}с  +${S.rare.xp}xp  H+${S.rare.heat}  RARE x${S.rare.mult} · ${fmtTime(left)}`, 'gold');
+    const reward = Math.round(S.rare.money * hackRewardMult());
+    out(`  > ${S.rare.name.padEnd(17)} $${fmt(reward).padEnd(7)} ${String(S.rare.time).padStart(2)}с  +${S.rare.xp}xp  H+${S.rare.heat}  RARE x${S.rare.mult} · ${fmtTime(left)}`, 'gold');
   }
   out('');
   out('  hack — следующая цель · hack <название> — конкретная', 'dim');
@@ -2489,6 +2543,7 @@ function renderFarm(){
 }
 
 function cmdTeam(args){
+  if (S.teamAlert){ S.teamAlert = false; save(true); }
   const a = (args[0] || '').toLowerCase();
   if (a === 'list'){
     if (!S.offers.length) rollOffers();
@@ -2897,6 +2952,8 @@ function cmdReset(arg){
   cutscene.active = false;
   stopNickGlitch();
   if (choiceTimer){ clearTimeout(choiceTimer); choiceTimer = null; }
+  if (choiceCloseTimer){ clearTimeout(choiceCloseTimer); choiceCloseTimer = null; }
+  choiceCanClose = false;
   choiceMode = null;
   if (choiceEl) choiceEl.classList.remove('on');
   document.body.classList.remove('choice-open');
@@ -3064,6 +3121,19 @@ if (choiceInput){
     } else if (e.key === 'Escape'){
       e.preventDefault();
     }
+  });
+}
+
+document.addEventListener('keydown', e => {
+  if (choiceMode === 'done' && choiceCanClose){
+    e.preventDefault();
+    finishChoice();
+  }
+}, true);
+
+if (choiceEl){
+  choiceEl.addEventListener('click', () => {
+    if (choiceMode === 'done' && choiceCanClose) finishChoice();
   });
 }
 

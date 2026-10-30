@@ -28,7 +28,7 @@
   #app{
     position:fixed;inset:0;margin:0 auto;max-width:1040px;
     display:flex;flex-direction:column;
-    padding:16px 22px 14px;
+    padding:38px 22px 14px;
   }
   #hud{
     display:none;flex-wrap:wrap;gap:4px 12px;align-items:baseline;
@@ -78,6 +78,51 @@
   .note.dim{color:#7dffab;border-left-color:#1d8f45;}
   @keyframes noteIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:none;}}
   body.cutscene #notes{display:none;}
+
+  /* ---------- значки-напоминания ---------- */
+  .icon{
+    display:block;width:22px;height:22px;
+    background:currentColor;
+    -webkit-mask:var(--m) center/contain no-repeat;
+    mask:var(--m) center/contain no-repeat;
+  }
+  .icon-mail{--m:url(../icons/mail.svg);}
+  .icon-skill{--m:url(../icons/skill_point.svg);}
+  .icon-team-plus{--m:url(../icons/team_plus.svg);}
+  .icon-team-warning{--m:url(../icons/team_warning.svg);}
+  .icon-anonymous{--m:url(../icons/anonymous.svg);}
+  .icon-signal{--m:url(../icons/signal.svg);}
+
+  #netbadge{
+    position:fixed;left:14px;top:9px;z-index:85;
+    display:none;align-items:center;gap:9px;
+    color:#b6ffcf;pointer-events:none;
+    filter:drop-shadow(0 0 5px rgba(51,255,119,.45));
+  }
+  #netbadge.on{display:flex;}
+  #netbadge .icon{width:20px;height:20px;}
+  #netbadge .signal{color:#33ff77;}
+
+  #badges{
+    position:fixed;right:16px;bottom:60px;z-index:85;
+    display:none;flex-direction:column;align-items:center;gap:10px;
+    pointer-events:none;
+  }
+  #badges.on{display:flex;}
+  .badge{display:none;color:#33ff77;}
+  .badge.on{display:block;animation:badgeBlink 2.6s ease-in-out infinite;}
+  .badge .icon{width:24px;height:24px;}
+  .badge-mail{color:#8ad8ff;filter:drop-shadow(0 0 6px rgba(90,200,255,.55));}
+  .badge-mail.on{animation-duration:3.4s;}
+  .badge-team{filter:drop-shadow(0 0 6px rgba(51,255,119,.55));}
+  .badge-team.on{display:flex;}
+  .badge-team .icon-team-warning{display:none;}
+  .badge-team.warn{color:#ff5a5a;filter:drop-shadow(0 0 7px rgba(255,60,60,.7));}
+  .badge-team.warn.on{animation-duration:1.4s;}
+  .badge-team.warn .icon-team-plus{display:none;}
+  .badge-team.warn .icon-team-warning{display:block;}
+  .badge-skill{filter:drop-shadow(0 0 6px rgba(51,255,119,.55));}
+  @keyframes badgeBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
 
   /* ---------- choice.exe: окно консоли Windows ---------- */
   body.choice-open::before,
@@ -153,7 +198,7 @@
   }
   @media (max-width:700px){
     body{font-size:17px;}
-    #app{padding:12px 12px 10px;}
+    #app{padding:30px 12px 10px;}
     #hud{font-size:.72em;gap:3px 9px;}
     #log{padding-right:2px;}
   }
