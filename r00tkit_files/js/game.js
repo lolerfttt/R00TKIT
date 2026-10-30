@@ -2808,9 +2808,11 @@ function cmdCool(){
 }
 
 function adminPanel(){
+  if (S.chapter2) return adminPanel2();
   out('АДМИН-ПАНЕЛЬ', 'head');
   out('');
   out('  admin money <n>    баланс (+/-)');
+  out('  admin earned <n>   всего заработано (для писем главы 2)');
   out('  admin xp <n>       опыт');
   out('  admin points <n>   очки навыков');
   out('  admin level <n>    уровень');
@@ -2825,8 +2827,72 @@ function adminPanel(){
   out('  admin choice open  открыть choice.exe сразу');
   out('  admin rare         спавн редкой цели');
   out('  admin final        финальный экран (сдача)');
+  out('  admin chapter 1|2  переключить главу (2 — заново)');
   out('  admin wipe         полный сброс (как первый запуск)');
   out('');
+}
+
+function adminPanel2(){
+  out('АДМИН-ПАНЕЛЬ · ГЛАВА 2', 'head');
+  out('');
+  out('  admin money <n>    баланс (+/-)');
+  out('  admin trust <n>    доверие 0..100');
+  out('  admin ops <n>      число завершённых операций');
+  out('  admin sp <n>       очки навыков');
+  out('  admin reset        начать главу 2 заново');
+  out('  admin chapter 1|2  переключить главу');
+  out('  admin wipe         полный сброс (как первый запуск)');
+  out('');
+}
+
+function adminChapter(arg){
+  const ch = parseInt(arg, 10);
+  if (ch !== 1 && ch !== 2){ out('[ADMIN] admin chapter 1|2', 'err'); return; }
+  if (!booted){ out('[ADMIN] сначала start.', 'err'); return; }
+  if (!window.GarageChapter2){ out('[ADMIN] глава 2 не загружена.', 'err'); return; }
+  if (ch === 1 && !S.chapter2){ out('[ADMIN] ты уже в главе 1.', 'dim'); return; }
+  if (ch === 2) window.GarageChapter2.adminEnter();
+  else window.GarageChapter2.adminExit();
+}
+
+function cmdAdmin2(a, raw, n){
+  const c = S.ch2 || {};
+  switch(a){
+    case 'money':
+      if (!isFinite(n)){ out('admin money <n>', 'err'); return; }
+      S.money = Math.max(0, S.money + n);
+      out(`[ADMIN] баланс: $${fmt(S.money)}`, 'ok');
+      break;
+    case 'trust':
+      if (!isFinite(n)){ out('admin trust <n>', 'err'); return; }
+      c.trust = clamp(n, 0, 100);
+      out(`[ADMIN] доверие: ${Math.round(c.trust)}`, 'ok');
+      break;
+    case 'ops':
+      if (!isFinite(n)){ out('admin ops <n>', 'err'); return; }
+      c.done = Math.max(0, Math.floor(n));
+      out(`[ADMIN] операций: ${c.done}`, 'ok');
+      break;
+    case 'sp':
+      if (!isFinite(n)){ out('admin sp <n>', 'err'); return; }
+      c.sp = Math.max(0, Math.floor(n));
+      out(`[ADMIN] очки навыков: ${c.sp}`, 'ok');
+      break;
+    case 'reset':
+      window.GarageChapter2.adminEnter();
+      return;
+    case 'chapter':
+      adminChapter(raw);
+      return;
+    case 'wipe':
+      adminWipe();
+      return;
+    default:
+      adminPanel2();
+      return;
+  }
+  save(true);
+  renderHUD();
 }
 
 function parseAmount(s){
@@ -2858,11 +2924,18 @@ function cmdAdmin(args){
   const raw = args[1];
   const n = parseAmount(raw);
 
+  if (S.chapter2) return cmdAdmin2(a, raw, n);
+
   switch(a){
     case 'money':
       if (!isFinite(n)){ out('admin money <n>', 'err'); return; }
       S.money = Math.max(0, S.money + n);
       out(`[ADMIN] баланс: $${fmt(S.money)}`, 'ok');
+      break;
+    case 'earned':
+      if (!isFinite(n)){ out('admin earned <n>', 'err'); return; }
+      S.earned = Math.max(0, n);
+      out(`[ADMIN] всего заработано: $${fmt(S.earned)}`, 'ok');
       break;
     case 'xp':
       if (!isFinite(n)){ out('admin xp <n>', 'err'); return; }
@@ -2938,6 +3011,9 @@ function cmdAdmin(args){
       S.finished = 'surrender';
       renderFinal();
       break;
+    case 'chapter':
+      adminChapter(raw);
+      return;
     case 'wipe':
       adminWipe();
       break;

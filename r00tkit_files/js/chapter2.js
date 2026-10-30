@@ -154,6 +154,8 @@ function prisonEnding(){
 /* ---------- вход в главу 2 ---------- */
 
 async function enterChapter2(){
+  pendingEscape = false;
+  socialPick = false;
   const old = state();
   const nick = old.nick || Core.readNick();
   const next = Core.newState();
@@ -691,6 +693,37 @@ function cmdLeave(c){
   Core.save();
 }
 
+/* ---------- админ-переключение ---------- */
+
+function adminExit(){
+  pendingEscape = false;
+  socialPick = false;
+  const old = state();
+  const nick = old.nick || Core.readNick();
+  const next = Core.newState();
+  next.started = true;
+  next.nick = nick;
+  next.money = 1000;
+  next.earned = 1000;
+  next.story = 1;
+  next.tutorialDone = true;
+  next.tutorialStep = 8;
+  next.chapter2 = false;
+  Core.setState(next);
+  Core.clearConsole();
+  Core.updatePrompt();
+  Core.renderHUD();
+  Core.hideHints();
+  Core.setTask('');
+  out('ГЛАВА 1 · ПЕСОЧНИЦА', 'head');
+  out('  гараж · $1000 · прогресс главы 2 сброшен', '');
+  out('  admin earned <n> — поднять заработок для писем главы 2', 'dim');
+  out('  admin chapter 2 — перейти в главу 2 заново', 'dim');
+  out('');
+  Core.focusInput();
+  Core.save();
+}
+
 /* ---------- диспетчер ---------- */
 
 function handle(cmd, args, line){
@@ -779,6 +812,8 @@ window.GarageChapter2 = {
   tick(){ ensure(); },
   tickChapter1,
   menu,
-  start
+  start,
+  adminEnter: () => enterChapter2(),
+  adminExit
 };
 })();
