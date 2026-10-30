@@ -30,6 +30,7 @@
     gameplay:    '3percent - FIRST ACTION.ogg',
     hunting:     '3percent - Hunting Time.ogg',
     double_cash: '3percent - Double Ca$h.ogg',
+    panic:       '3percent - PANIC.ogg',
     scene:       '500k_scene.ogg'
   };
 
@@ -38,7 +39,8 @@
     { id: 'menu',        title: '3percent - light lab', menuOnly: true },
     { id: 'gameplay',    title: '3percent - FIRST ACTION' },
     { id: 'hunting',     title: '3percent - Hunting Time' },
-    { id: 'double_cash', title: '3percent - Double Ca$h' }
+    { id: 'double_cash', title: '3percent - Double Ca$h' },
+    { id: 'panic',       title: '3percent - PANIC' }
   ];
   const trackNameEl = document.getElementById('tr-name');
   let manualTrack = null;
@@ -62,7 +64,7 @@
     enter: 1.0,
     glitch: 1.0
   };
-  const MUSIC_VOLUME = { menu: 0.85, gameplay: 0.3, hunting: 0.23, double_cash: 0.24, scene: 0.45 };
+  const MUSIC_VOLUME = { menu: 0.85, gameplay: 0.3, hunting: 0.23, double_cash: 0.24, panic: 0.65, scene: 0.45 };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -202,7 +204,7 @@
     fadeTo(next, 500);
   }
 
-  for (const id of ['gameplay', 'hunting', 'double_cash']){
+  for (const id of ['gameplay', 'hunting', 'double_cash', 'panic']){
     music[id].addEventListener('ended', () => autoNext(id));
   }
 
