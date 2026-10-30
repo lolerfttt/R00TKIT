@@ -1314,8 +1314,10 @@ function addXP(n){
 
 function startJob(t){
   S.job = { id:t.id, name:t.name, elapsed:0, duration:t.time / hackSpeed(), frozen:false, freezeAt:null, phraseBonus:false };
-  if (S.phraseIn > 0) S.phraseIn--;
-  if (S.phraseIn <= 0) S.job.freezeAt = 0.25 + Math.random() * 0.35;
+  if (!tutActive()){
+    if (S.phraseIn > 0) S.phraseIn--;
+    if (S.phraseIn <= 0) S.job.freezeAt = 0.25 + Math.random() * 0.35;
+  }
   const reward = t.money * hackRewardMult();
   S.job.reward = reward;
   out('');
