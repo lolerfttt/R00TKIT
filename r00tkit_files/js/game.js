@@ -36,9 +36,7 @@ const netBadge = $('netbadge');
 const STAGES = [
   { name:'ГАРАЖ',       host:'garage',  cost:0,        mult:1,   slots:1,  lore:'бетон, паяльник и один ноут.' },
   { name:'КВАРТИРА',    host:'flat',    cost:5000,     mult:1.5, slots:2, lore:'съёмная студия. соседи ничего не слышат.' },
-  { name:'ОФИС',        host:'office',  cost:120000,   mult:2.2, slots:4, lore:'легальный фасад. кофемашина и серверная.' },
-  { name:'ДАТА-ЦЕНТР',  host:'dc',      cost:3000000,  mult:3.2, slots:7, lore:'сотни стоек. охлаждение гудит как море.' },
-  { name:'ОРБИТА',      host:'orbital', cost:80000000, mult:4.5, slots:10,lore:'над облаками. над законом.' },
+  { name:'ДАТА-ЦЕНТР',  host:'dc',      cost:3000000,  mult:3.2, slots:4, lore:'сотни стоек. охлаждение гудит как море.' },
 ];
 
 const TARGET_VARIANTS = [
@@ -222,6 +220,7 @@ function newState(){
     story:0, mailRead:false, choiceOpened:false, choiceResult:'', choiceAt:0,
     tone:'', finished:'', flags:{ backdoor:false, joined:false },
     tutorialDone:false, tutorialStep:0, showHints:false, teamAlert:false,
+    chapter2:false, ch2:null, ch2Mail:{ m1:false, m2:false, m3:false },
     nick:readNick()
   };
 }
@@ -1173,6 +1172,8 @@ function hydrate(d){
   S.finished = typeof S.finished === 'string' ? S.finished : '';
   S.flags = Object.assign({ backdoor:false, joined:false }, d && d.flags || {});
   S.teamAlert = !!(d && d.teamAlert);
+  S.chapter2 = !!S.chapter2;
+  S.ch2Mail = Object.assign({ m1:false, m2:false, m3:false }, d && d.ch2Mail || {});
   if (S.choiceResult) S.choiceOpened = true;
   S.phraseIn = (isFinite(Number(S.phraseIn)) && Number(S.phraseIn) >= 0)
     ? Math.floor(Number(S.phraseIn))
@@ -1213,6 +1214,17 @@ function applyOffline(){
 
 function renderHUD(){
   if (!booted) return;
+  if (S.chapter2){
+    const c = S.ch2 || {};
+    $('h-loc').textContent = 'ТИХАЯ КОМНАТА';
+    $('h-money').textContent = '$' + fmtHud(S.money);
+    $('h-inc').textContent = 'TRUST ' + Math.round(Number(c.trust) || 0);
+    $('h-lvl').textContent = 'ОП ' + (Number(c.done) || 0);
+    $('h-xp').textContent = 'ГЛАВА 2';
+    $('h-heat').textContent = 'ONLINE';
+    $('h-heat').classList.remove('hot');
+    return;
+  }
   const need = xpNeed(S.level);
   $('h-loc').textContent = stage().name;
   const inc = income();
@@ -1244,6 +1256,14 @@ function tick(){
   let dt = (now - lastTick) / 1000;
   lastTick = now;
   dt = clamp(dt, 0, 120);
+
+  if (booted && S.chapter2){
+    if (window.GarageChapter2) window.GarageChapter2.tick();
+    renderHUD();
+    updateBadges();
+    return;
+  }
+  if (booted && window.GarageChapter2) window.GarageChapter2.tickChapter1();
 
   if (booted && !cutscene.active && !transitioning){
     S.playTime += dt;
@@ -1784,12 +1804,13 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v0.2'),
+  artLine('prod by 3percent · v1.0'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
 
 function menu(){
+  if (S.chapter2 && window.GarageChapter2){ window.GarageChapter2.menu(); return; }
   logEl.innerHTML = '';
   jobEl = null;
   menuEl = null;
@@ -1824,6 +1845,20 @@ async function cmdStart(){
   if (S.finished){ renderFinal(); return; }
   if (booted){
     out('система уже запущена. status — состояние.', 'dim');
+    return;
+  }
+  if (S.chapter2 && window.GarageChapter2){
+    S.nick = readNick() || S.nick;
+    booted = true;
+    S.started = true;
+    S.showHints = false;
+    S.lastSave = Date.now();
+    music('gameplay');
+    hud.style.display = 'flex';
+    updatePrompt();
+    window.GarageChapter2.start();
+    renderHUD();
+    save(true);
     return;
   }
   const resumed = S.started;
@@ -1878,6 +1913,26 @@ function cutAlive(token){
   return cutscene.active && cutscene.token === token;
 }
 
+function beginCutscene(){
+  cutscene.active = true;
+  cutscene.token++;
+  input.disabled = true;
+  input.blur();
+  document.body.classList.add('cutscene');
+  return cutscene.token;
+}
+
+function finishCutscene(token){
+  if (token != null && cutscene.token !== token) return false;
+  cutscene.active = false;
+  stopNickGlitch();
+  document.body.classList.remove('cutscene', 'cut-flicker');
+  input.disabled = false;
+  updatePrompt();
+  save(true);
+  return true;
+}
+
 function glitchNicks(){
   const base = 'unknown';
   document.querySelectorAll('.cut-nick').forEach(el => {
@@ -1909,13 +1964,13 @@ function scheduleNickGlitch(token){
   cutscene.nickTimer = setTimeout(step, 1100 + Math.random() * 500);
 }
 
-async function cutLine(who, text, token, cls = ''){
+async function cutLine(who, text, token, cls = '', name = ''){
   if (!cutAlive(token)) return;
   const d = document.createElement('div');
   d.className = 'line cut-line' + (cls ? ' ' + cls : '');
   const nick = document.createElement('span');
   nick.className = who === 'hacker' ? 'cut-nick' : 'cut-you';
-  nick.textContent = who === 'hacker' ? 'unknown' : 'you';
+  nick.textContent = name || (who === 'hacker' ? 'unknown' : 'you');
   const sep = document.createElement('span');
   sep.className = 'cut-sep';
   sep.textContent = ' > ';
@@ -2452,7 +2507,8 @@ function renderMail(){
   }
   out('');
   out('  mail clear — очистить почту · письма с вложениями не удаляются', 'dim');
-  if (hasChoiceLetter()) out('  открыть вложение: open choice.exe', 'white');
+  const atts = (S.mails || []).filter(m => m.attachment);
+  for (const m of atts) out(`  открыть вложение: open ${m.attachment}`, 'white');
   out('');
 }
 
@@ -2760,7 +2816,7 @@ function adminPanel(){
   out('  admin level <n>    уровень');
   out('  admin rigs <n>     количество ригов');
   out('  admin team <n>     команда');
-  out('  admin stage <n>    локация 0..4');
+  out('  admin stage <n>    локация 0..2');
   out('  admin heat <n>     нагрев');
   out('  admin god          x1000 доход');
   out('  admin phrase       seed-проверка (сразу или на след. взломе)');
@@ -3042,6 +3098,8 @@ function run(line){
     return;
   }
 
+  if (window.GarageChapter2 && window.GarageChapter2.handle(cmd, args, line)) return;
+
   if (cmd === 'mail' && S.story === 0 && !S.mails.length){
     out('[MAIL] почта пуста.', 'dim');
     return;
@@ -3201,6 +3259,22 @@ async function initUI(){
 }
 
 window.Garage = { init: initUI };
+
+window.GarageCore = {
+  get state(){ return S; },
+  setState(next){ S = next; },
+  newState: () => newState(),
+  readNick: () => readNick(),
+  out, outHTML, outTyped, clearConsole,
+  fmt, fmtTime, esc, note,
+  addMail, storyMail, sfx, music,
+  beginCutscene, finishCutscene, cutLine, cutAlive, sleep,
+  renderHUD, updatePrompt, updateBadges,
+  save: () => save(true),
+  hideHints(){ hintsEl.classList.add('off'); },
+  setTask(text){ taskEl.hidden = !text; taskEl.textContent = text || ''; },
+  focusInput(){ input.disabled = false; input.focus(); }
+};
 
 setInterval(tick, 100);
 setInterval(() => { if (booted) save(true); }, 10000);
