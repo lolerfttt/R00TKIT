@@ -1325,15 +1325,18 @@ function renderHUD(){
   if (!booted) return;
   if (RUN.chapter === 2){
     const c = S || {};
-    const rate = (Number(c.virusRate) || 0) * (c.tutorial && !c.tutorial.done ? 5 : 1);
+    const rate = Number(c.virusRate) || 0;
     const points = Number(c.virusPoints) || 0;
     const t = c.case;
     const p = t ? clamp((Number(t.progress) || 0) / (Number(t.need) || 1), 0, 1) : 0;
     const filled = Math.round(p * 10);
     const infoBar = '[' + '|'.repeat(filled) + '.'.repeat(10 - filled) + ']';
+    const virusText = Number(c.sp) > 0
+      ? `VIRUS: ${points.toFixed(1)}/10 (пауза, есть SP) · ${Number(c.virusInfected) || 0} ПК`
+      : `VIRUS: ${points.toFixed(1)}/10 (+${rate.toFixed(1)}/с) · ${Number(c.virusInfected) || 0} ПК`;
     $('h-loc').textContent = 'N3X: ' + (Number(c.n3x) || 0).toFixed(1);
     $('h-money').textContent = 'SP: ' + (Number(c.sp) || 0);
-    $('h-inc').textContent = 'VIRUS: ' + points.toFixed(1) + '/100 (+' + rate.toFixed(1) + '/с) · ' + (Number(c.virusInfected) || 0) + ' ПК';
+    $('h-inc').textContent = virusText;
     $('h-lvl').textContent = t ? `ИНФО ${infoBar} ${Math.floor(t.progress)}/${t.need}` : 'ИНФО [..........] —';
     $('h-xp').textContent = '';
     $('h-heat').textContent = '';
@@ -1951,7 +1954,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v2.1'),
+  artLine('prod by 3percent · v2.2'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');

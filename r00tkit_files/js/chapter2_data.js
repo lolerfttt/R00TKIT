@@ -28,19 +28,27 @@ const CASES = [
   }
 ];
 
-const TUTORIAL_CASE = {
-  id:'tutorial', name:'test.subject', title:'Тестовый человек', need:50, digs:5, reward:5,
-  lore:'Случайный человек из старой базы. Никто. Проверка навыков перед настоящей работой.'
-};
+const TUTORIAL_CASES = [
+  { id:'t1', name:'заказ 1', title:'взломать instagram пользователя', need:50, digs:5, reward:5,
+    lore:'Проверка навыков: достать доступ к чужому аккаунту.' },
+  { id:'t2', name:'заказ 2', title:'снять резервную копию чата', need:50, digs:5, reward:5,
+    lore:'Проверка навыков: вытащить переписку из резервной копии.' },
+  { id:'t3', name:'заказ 3', title:'найти открытый профиль', need:50, digs:5, reward:5,
+    lore:'Проверка навыков: собрать данные из открытых источников.' },
+  { id:'t4', name:'заказ 4', title:'вытащить геолокацию', need:50, digs:5, reward:5,
+    lore:'Проверка навыков: найти координаты по цифровому следу.' },
+  { id:'t5', name:'заказ 5', title:'подтвердить личность', need:50, digs:5, reward:5,
+    lore:'Проверка навыков: сверить аккаунты и подтвердить личность.' }
+];
 
 const NETWORKS = [
-  { id:1, name:'botnet', label:'Сеть ботов', price:5, pc:1, rate:0.20 },
-  { id:2, name:'routers', label:'Роутеры', price:12, pc:2, rate:0.16 },
-  { id:3, name:'cams', label:'Камеры', price:30, pc:4, rate:0.13 },
-  { id:4, name:'nas', label:'NAS-хранилища', price:80, pc:8, rate:0.10 },
-  { id:5, name:'cloud', label:'Облачные ноды', price:200, pc:15, rate:0.08 },
-  { id:6, name:'scada', label:'SCADA', price:500, pc:30, rate:0.06 },
-  { id:7, name:'core', label:'Ядро синдиката', price:1200, pc:60, rate:0.05 }
+  { id:1, name:'botnet', label:'Сеть ботов', price:5, pc:1, rate:1.00 },
+  { id:2, name:'routers', label:'Роутеры', price:12, pc:2, rate:0.80 },
+  { id:3, name:'cams', label:'Камеры', price:30, pc:4, rate:0.65 },
+  { id:4, name:'nas', label:'NAS-хранилища', price:80, pc:8, rate:0.50 },
+  { id:5, name:'cloud', label:'Облачные ноды', price:200, pc:15, rate:0.40 },
+  { id:6, name:'scada', label:'SCADA', price:500, pc:30, rate:0.30 },
+  { id:7, name:'core', label:'Ядро синдиката', price:1200, pc:60, rate:0.25 }
 ];
 
 const SKILLS = {
@@ -131,5 +139,5 @@ const DARKNET = {
   ]
 };
 
-window.R00TKITChapter2Data = { CASES, TUTORIAL_CASE, NETWORKS, SKILLS, MAILS, CUTSCENE, DARKNET };
+window.R00TKITChapter2Data = { CASES, TUTORIAL_CASES, NETWORKS, SKILLS, MAILS, CUTSCENE, DARKNET };
 })();

@@ -39,6 +39,7 @@ function createState(){
     darknet: { offers: [], hot: null, rumors: [], nextRoll: 0 },
     burnAt: 0,
     lastDigAt: 0,
+    cdNotice: false,
     burnAlert: false,
     pendingMail: null,
     storyDone: false,
@@ -73,6 +74,7 @@ function ensureState(s){
   if (!s.case || typeof s.case !== 'object') s.case = null;
   if (!s.sideCase || typeof s.sideCase !== 'object') s.sideCase = null;
   if (!s.pendingMail) s.pendingMail = null;
+  if (typeof s.cdNotice !== 'boolean') s.cdNotice = false;
   return s;
 }
 
@@ -89,7 +91,8 @@ function stashLegacy(s){
 }
 
 function makeCase(id){
-  const def = id === 'tutorial' ? D.TUTORIAL_CASE : D.CASES.find(c => c.id === id);
+  const tut = D.TUTORIAL_CASES.find(c => c.id === id);
+  const def = tut || D.CASES.find(c => c.id === id);
   if (!def) return null;
   return {
     id: def.id,
@@ -98,7 +101,8 @@ function makeCase(id){
     need: def.need,
     digs: def.digs,
     progress: 0,
-    story: id !== 'tutorial',
+    story: !tut,
+    tutorial: !!tut,
     lore: def.lore || ''
   };
 }
@@ -190,25 +194,31 @@ function bindMailKey(){
   if (mailKeyBound) return;
   mailKeyBound = true;
   document.addEventListener('keydown', onMailKey, true);
+  document.addEventListener('keyup', onMailKey, true);
   document.addEventListener('pointerdown', onMailPointer, true);
+  document.addEventListener('pointerup', onMailPointer, true);
 }
 
 function unbindMailKey(){
   if (!mailKeyBound) return;
   mailKeyBound = false;
   document.removeEventListener('keydown', onMailKey, true);
+  document.removeEventListener('keyup', onMailKey, true);
   document.removeEventListener('pointerdown', onMailPointer, true);
+  document.removeEventListener('pointerup', onMailPointer, true);
 }
 
 function onMailKey(e){
   if (!mailLock || mailLock.phase !== 'close') return;
   e.preventDefault();
+  e.stopPropagation();
   closeMail();
 }
 
 function onMailPointer(e){
   if (!mailLock || mailLock.phase !== 'close') return;
   e.preventDefault();
+  e.stopPropagation();
   closeMail();
 }
 
@@ -217,15 +227,15 @@ function showMail(c, id){
   if (!m){ out('нет такого письма. mail — список.', 'err'); return; }
   if (mailLock) return;
   if (Core.state !== c) return;
-  Core.clearConsole();
+  out('');
+  out('────────────────────────', 'dim');
   out(`ПИСЬМО · ${m.from}`, 'head');
   out('');
   out('  ' + m.subject, '');
   out('');
   for (const line of String(m.body || '').split('\n')) out('  ' + line, '');
   out('');
-  out('  ввод заблокирован на 3 секунды...', 'dim');
-  Core.setTask('письмо: прочитай');
+  Core.setTask('письмо · закрой после прочтения');
   Core.disableInput();
   mailLock = { id, phase: 'wait' };
   const token = c;
@@ -256,6 +266,7 @@ function closeMail(){
   if (c) setTaskFor(c);
   Core.save();
   Core.updateBadges();
+  if (c) cmdCase(c);
 }
 
 function maybeShowPendingMail(c){
@@ -271,8 +282,8 @@ function maybeShowPendingMail(c){
 /* ---------- HUD / задачи ---------- */
 
 function effectiveVirusRate(c){
-  if (!c) return 0;
-  return (Number(c.virusRate) || 0) * (!c.tutorial.done ? 5 : 1);
+  if (!c || c.sp > 0) return 0;
+  return Number(c.virusRate) || 0;
 }
 
 function setTaskFor(c){
@@ -281,16 +292,16 @@ function setTaskFor(c){
     const step = c.tutorial.step || 1;
     const p = c.case ? Math.floor(c.case.progress) : 0;
     if (step <= 1) return Core.setTask('ОБУЧЕНИЕ 1/7 · открой darknet: darknet');
-    if (step === 2) return Core.setTask('ОБУЧЕНИЕ 2/7 · возьми тестовый заказ: darknet take 1');
+    if (step === 2) return Core.setTask('ОБУЧЕНИЕ 2/7 · возьми заказ: darknet take <id>');
     if (step === 3) return Core.setTask(`ОБУЧЕНИЕ 3/7 · копай: dig · ИНФО ${p}/50`);
-    if (step === 4) return Core.setTask('ОБУЧЕНИЕ 4/7 · информация собрана. слей: expose');
+    if (step === 4) return Core.setTask('ОБУЧЕНИЕ 4/7 · информация собрана. отправь данные хакеру — expose');
     if (step === 5) return Core.setTask('ОБУЧЕНИЕ 5/7 · открой сети: virus');
-    if (step === 6) return Core.setTask('ОБУЧЕНИЕ 6/7 · купи сеть ботов: virus buy 1');
-    if (c.sp < 1) return Core.setTask(`ОБУЧЕНИЕ 7/7 · жди VIRUS ${c.virusPoints.toFixed(1)}/100 (+${effectiveVirusRate(c).toFixed(1)}/с)`);
+    if (step === 6) return Core.setTask('ОБУЧЕНИЕ 6/7 · купи сеть ботов');
+    if (c.sp < 1) return Core.setTask(`ОБУЧЕНИЕ 7/7 · жди VIRUS ${c.virusPoints.toFixed(1)}/10 (+${effectiveVirusRate(c).toFixed(1)}/с)`);
     if (!c.tutorial.skillPrompt) return Core.setTask('ОБУЧЕНИЕ 7/7 · открой навыки: skills');
-    return Core.setTask('ОБУЧЕНИЕ 7/7 · вложи SP в Speed: skills buy speed');
+    return Core.setTask('ОБУЧЕНИЕ 7/7 · вложи SP в Speed');
   }
-  if (c.pendingMail || unreadRequired(c)) return Core.setTask('прочитай письмо: mail');
+  if (c.pendingMail || unreadRequired(c)) return Core.setTask('новое письмо · открой: mail');
   if (c.case) return Core.setTask(`ИНФО ${c.case.title || c.case.name} · ${Math.floor(c.case.progress)}/${c.case.need}`);
   if (c.storyDone) return Core.setTask('история главы 2 завершена');
   return Core.setTask('case — текущее дело · darknet — заказы');
@@ -302,7 +313,7 @@ function showStatus(){
   Core.clearConsole();
   const target = c.case;
   out('ТИХАЯ КОМНАТА', 'head');
-  out(`  N3X ${c.n3x.toFixed(1)} · SP ${c.sp} · VIRUS ${c.virusPoints.toFixed(1)}/100 (+${effectiveVirusRate(c).toFixed(1)}/с) · ${c.virusInfected} ПК`, '');
+  out(`  N3X ${c.n3x.toFixed(1)} · SP ${c.sp} · VIRUS ${c.virusPoints.toFixed(1)}/10 ${c.sp > 0 ? '(пауза, есть SP)' : '(+' + effectiveVirusRate(c).toFixed(1) + '/с)'} · ${c.virusInfected} ПК`, '');
   out('');
   if (target){
     out(`  дело: ${target.title || target.name} · ${Math.floor(target.progress)}/${target.need}`, '');
@@ -434,19 +445,22 @@ function cmdDig(c, side){
   if (target.progress >= target.need){
     if (!c.tutorial.done && c.tutorial.step === 3) c.tutorial.step = 4;
     out('ИНФО уже 100%.', 'dim');
-    outHTMLLocal('  слить: <span class="ok">expose</span>');
     setTaskFor(c);
     return;
   }
   const now = Date.now();
   const cd = digCooldown(c) * 1000;
   if (now - (c.lastDigAt || 0) < cd){
-    out(`подожди ${Math.ceil((cd - (now - c.lastDigAt)) / 1000)}с перед следующим dig`, 'dim');
+    if (!c.cdNotice){
+      c.cdNotice = true;
+      out(`подожди ${Math.max(1, Math.ceil((cd - (now - c.lastDigAt)) / 1000))} сек`, 'dim');
+    }
     return;
   }
+  c.cdNotice = false;
   c.lastDigAt = now;
   out('');
-  if (Math.random() < 0.10){
+  if (target.progress >= target.need * 0.2 && Math.random() < 0.06){
     out('> dig провалился. след пустой. прогресс не изменился.', 'warn');
     out('');
     Core.save();
@@ -463,17 +477,12 @@ function cmdDig(c, side){
   }
   if (target.progress >= target.need){
     if (!c.tutorial.done && c.tutorial.step === 3) c.tutorial.step = 4;
-    outHTMLLocal('> ИНФО 100% · информация собрана. <span class="dim">слей:</span> <span class="ok">expose</span>');
+    out('> ИНФО 100% · информация собрана.', 'ok');
     out('');
   }
   setTaskFor(c);
   Core.save();
   Core.renderHUD();
-}
-
-function outHTMLLocal(html, cls = ''){
-  if (Core.outHTML) Core.outHTML(html, cls);
-  else out(html.replace(/<[^>]+>/g, ''), cls);
 }
 
 function cmdExpose(c, side){
@@ -494,14 +503,13 @@ function cmdExpose(c, side){
     out(`ИНФО ${Math.floor(target.progress)}/${target.need}. нужно 100%.`, 'err');
     return;
   }
-  if (!side && target.id === 'tutorial'){
+  if (!side && target.tutorial){
     c.n3x += 5;
     c.case = null;
     c.tutorial.step = 5;
     c.lastDigAt = 0;
     out('');
-    out('[EXPOSE] тестовый человек сдан · +5.0 N3X', 'ok');
-    outHTMLLocal('  дальше: открой сети — <span class="ok">virus</span>');
+    out('[EXPOSE] тестовый заказ сдан · +5.0 N3X', 'ok');
     out('');
     setTaskFor(c);
     Core.save();
@@ -548,13 +556,31 @@ function networkPrice(net, owned){
   return Math.round(net.price * Math.pow(1.6, owned));
 }
 
+function ownedNetworkCount(c){
+  let n = 0;
+  for (const net of D.NETWORKS) n += Number(c.networks[net.id]) || 0;
+  return n;
+}
+
+function recomputeVirus(c){
+  let pc = 0, rate = 0;
+  for (const net of D.NETWORKS){
+    const owned = Number(c.networks[net.id]) || 0;
+    if (!owned) continue;
+    pc += net.pc * owned;
+    for (let i = 0; i < owned; i++) rate += net.rate * Math.pow(0.85, i);
+  }
+  c.virusInfected = pc;
+  c.virusRate = rate;
+}
+
 function virusList(){
   const c = ensure();
   if (!c) return;
   Core.clearConsole();
   out('VIRUS · СЕТИ', 'head');
   out('');
-  out(`  VIRUS ${c.virusPoints.toFixed(1)}/100 · +${effectiveVirusRate(c).toFixed(1)}/с · ${c.virusInfected} ПК`, 'dim');
+  out(`  VIRUS ${c.virusPoints.toFixed(1)}/10 · ${c.sp > 0 ? 'пауза, есть SP' : '+' + effectiveVirusRate(c).toFixed(1) + '/с'} · ${c.virusInfected} ПК`, 'dim');
   out('');
   const list = c.tutorial.done ? D.NETWORKS : D.NETWORKS.slice(0, 1);
   for (const net of list){
@@ -564,8 +590,13 @@ function virusList(){
     out(`  [${net.id}] ${net.label.padEnd(16)} ур.${owned} · ${price} N3X · +${net.pc} ПК · +${addRate.toFixed(1)}/с`, '');
   }
   out('');
-  if (!c.tutorial.done) out('  остальные сети откроются после обучения.', 'dim');
-  out(`  купить: virus buy ${c.tutorial.done ? '<id>' : '1'}`, 'ok');
+  if (!c.tutorial.done){
+    out('  остальные сети откроются после обучения.', 'dim');
+    out('  virus buy <id>      купить сеть за N3X', 'dim');
+  } else {
+    out('  virus list          список сетей', 'dim');
+    out('  virus buy <id>      купить сеть за N3X', 'ok');
+  }
   out('');
 }
 
@@ -598,10 +629,9 @@ function cmdVirus(c, args){
   if (c.n3x < price){ out(`нужно ${price} N3X. не хватает ${(price - c.n3x).toFixed(1)}.`, 'err'); return; }
   c.n3x -= price;
   c.networks[net.id] = owned + 1;
-  c.virusInfected += net.pc;
-  c.virusRate += net.rate * Math.pow(0.85, owned);
+  recomputeVirus(c);
   out(`[VIRUS] ${net.label} · +${net.pc} ПК · +${(net.rate * Math.pow(0.85, owned)).toFixed(1)}/с`, 'ok');
-  out(`  VIRUS ${c.virusPoints.toFixed(1)}/100 · +${effectiveVirusRate(c).toFixed(1)}/с · ${c.virusInfected} ПК`, 'dim');
+  out(`  VIRUS ${c.virusPoints.toFixed(1)}/10 · ${c.sp > 0 ? 'пауза, есть SP' : '+' + effectiveVirusRate(c).toFixed(1) + '/с'} · ${c.virusInfected} ПК`, 'dim');
   if (!c.tutorial.done && c.tutorial.step >= 5 && c.tutorial.step <= 6){
     c.tutorial.step = 7;
     out('  [ОБУЧЕНИЕ] сеть поставлена. жди VIRUS-поинты.', 'dim');
@@ -634,14 +664,14 @@ function cmdSkills(c, args){
     out('');
     if (!c.tutorial.done){
       out('  остальные навыки откроются после обучения.', 'dim');
-      out('  купить: skills buy speed', 'ok');
+      out('  skills buy <id>      потратить SP', 'dim');
       if (c.tutorial.step === 7 && c.sp > 0){
         c.tutorial.skillPrompt = true;
         setTaskFor(c);
         Core.save();
       }
     } else {
-      out('  купить: skills buy <id>', 'ok');
+      out('  skills buy <id>      потратить SP', 'ok');
     }
     out('');
     return;
@@ -728,9 +758,10 @@ function dnMenu(c){
   out('DARKNET', 'head');
   out('');
   if (!c.tutorial.done){
-    out('  [1] тестовый человек · 50 ИНФО · 5 N3X', '');
-    out('');
-    out('  взять: darknet take 1', 'ok');
+    for (let i = 0; i < D.TUTORIAL_CASES.length; i++){
+      const t = D.TUTORIAL_CASES[i];
+      out(`  [${i + 1}] ${t.title} · ${t.need} ИНФО · ${t.reward} N3X`, '');
+    }
     out('');
     if (c.tutorial.step <= 1){
       c.tutorial.step = 2;
@@ -762,19 +793,21 @@ function cmdDarknet(c, args){
   if (blockByMail(c)) return;
   const id = String(args[1] || '').toLowerCase();
   if (!c.tutorial.done){
-    if (id !== '1' && id !== 'test'){
-      out('во время обучения доступен только тестовый заказ: darknet take 1', 'dim');
+    let tut = null;
+    if (id === 'test') tut = D.TUTORIAL_CASES[0];
+    else tut = D.TUTORIAL_CASES[Number(id) - 1] || null;
+    if (!tut){
+      out('выбери заказ 1–5: darknet take <id>', 'dim');
       return;
     }
-    if (c.case && c.case.id === 'tutorial'){
-      out('тестовый заказ уже взят. копай: dig', 'dim');
+    if (c.case && c.case.tutorial){
+      out('заказ уже взят. копай: dig', 'dim');
       return;
     }
     Core.clearConsole();
-    c.case = makeCase('tutorial');
+    c.case = makeCase(tut.id);
     c.tutorial.step = 3;
-    out('[DARKNET] тестовый заказ взят · 50 ИНФО', 'ok');
-    out('  теперь копай: dig', 'dim');
+    out(`[DARKNET] заказ взят: ${tut.title} · ${tut.need} ИНФО`, 'ok');
     out('');
     setTaskFor(c);
     Core.save();
@@ -813,34 +846,12 @@ function help(){
   Core.clearConsole();
   out('ГЛАВА 2 · КОМАНДЫ', 'head');
   out('');
-  out('ДЕЛО', 'head');
-  out('  case                 текущее дело', '');
-  out('  dig                  копать основное дело', '');
-  out('  dig side             копать побочное', '');
-  out('  expose               сдать при 100%', '');
-  out('  expose side          сдать побочное', '');
-  out('');
-  out('ЗАКАЗЫ', 'head');
-  out('  darknet              список заказов и слухов', '');
-  out('  darknet take <id>    взять побочный заказ', '');
-  out('');
-  out('VIRUS', 'head');
-  out('  virus                меню сетей', '');
-  out('  virus list           список сетей', '');
-  out('  virus buy <id>       купить сеть за N3X', '');
-  out('');
-  out('РАЗВИТИЕ', 'head');
-  out('  skills               навыки', '');
-  out('  skills buy <id>      потратить SP', '');
-  out('');
-  out('ПОЧТА', 'head');
-  out('  mail                 список писем', '');
-  out('  mail read <id>       открыть письмо', '');
-  out('');
-  out('СИСТЕМА', 'head');
-  out('  help                 эта справка', '');
-  out('  status               состояние', '');
-  out('  reset confirm        начать главу 2 заново', '');
+  out('  case      текущее дело        status    состояние', '');
+  out('  dig       копать              mail      почта', '');
+  out('  expose    сдать данные        help      справка', '');
+  out('  darknet   заказы              reset     начать главу 2 заново', '');
+  out('  virus     сети', '');
+  out('  skills    навыки', '');
   out('');
 }
 
@@ -976,14 +987,13 @@ function tick(dt){
   const now = Date.now();
   dt = clamp(Number(dt) || 0.1, 0, 1);
 
-  // VIRUS passive; during tutorial — x5
-  if (c.virusRate > 0){
-    const mult = c.tutorial.done ? 1 : 5;
-    c.virusPoints += c.virusRate * mult * dt;
-    while (c.virusPoints >= 100){
-      c.virusPoints -= 100;
+  // VIRUS passive; пока есть непотраченный SP, не копится
+  if (c.sp < 1 && c.virusRate > 0){
+    c.virusPoints += c.virusRate * dt;
+    if (c.virusPoints >= 10){
+      c.virusPoints -= 10;
       c.sp++;
-      Core.note('SP +1 · 100 VIRUS сконвертированы', 'ok', 6000);
+      Core.note('SP +1 · 10 VIRUS сконвертированы', 'ok', 6000);
       Core.updateBadges();
     }
   }
@@ -1000,16 +1010,17 @@ function tick(dt){
     c.case.progress = Math.min(c.case.need, c.case.progress + rate * dt);
   }
 
-  // сгорание сети
+  // сгорание сети — только вне обучения и только если сетей больше одной
   if (!c.burnAt) c.burnAt = now + (6 + Math.floor(Math.random() * 5)) * 60000;
   if (now >= c.burnAt){
     c.burnAt = now + (6 + Math.floor(Math.random() * 5)) * 60000;
-    if (c.virusInfected > 0 && Math.random() < 0.20){
-      const loss = 0.10 + Math.random() * 0.10;
-      c.virusInfected = Math.max(0, Math.floor(c.virusInfected * (1 - loss)));
-      c.virusRate = Math.max(0, c.virusRate * (1 - loss));
+    if (c.tutorial.done && ownedNetworkCount(c) > 1 && Math.random() < 0.20){
+      const alive = D.NETWORKS.filter(net => (Number(c.networks[net.id]) || 0) > 0);
+      const burned = pick(alive);
+      c.networks[burned.id]--;
+      recomputeVirus(c);
       c.burnAlert = true;
-      Core.note(`СЕТЬ СГОРЕЛА · -${Math.round(loss * 100)}% VIRUS\nдокупи сеть: virus`, 'warn', 8000);
+      Core.note(`СЕТЬ СГОРЕЛА · ${burned.label}\nдокупи сеть: virus`, 'warn', 8000);
       Core.save();
     }
   }
