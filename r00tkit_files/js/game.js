@@ -1331,8 +1331,8 @@ function renderHUD(){
     const p = t ? clamp((Number(t.progress) || 0) / (Number(t.need) || 1), 0, 1) : 0;
     const filled = Math.round(p * 10);
     const infoBar = '[' + '|'.repeat(filled) + '.'.repeat(10 - filled) + ']';
-    const virusText = Number(c.sp) > 0
-      ? `VIRUS: ${points.toFixed(1)}/10 (пауза, есть SP) · ${Number(c.virusInfected) || 0} ПК`
+    const virusText = Number(c.sp) >= 5
+      ? `VIRUS: ${points.toFixed(1)}/10 (пауза, SP максимум) · ${Number(c.virusInfected) || 0} ПК`
       : `VIRUS: ${points.toFixed(1)}/10 (+${rate.toFixed(1)}/с) · ${Number(c.virusInfected) || 0} ПК`;
     $('h-loc').textContent = 'N3X: ' + (Number(c.n3x) || 0).toFixed(1);
     $('h-money').textContent = 'SP: ' + (Number(c.sp) || 0);
@@ -1954,7 +1954,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v2.2'),
+  artLine('prod by 3percent · v2.3'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');

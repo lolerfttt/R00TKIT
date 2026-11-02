@@ -52,11 +52,12 @@ const NETWORKS = [
 ];
 
 const SKILLS = {
-  speed:    { name:'Speed',    base:1, cap:10, desc:'−5% времени dig за уровень' },
-  depth:    { name:'Depth',    base:1, cap:10, desc:'+10% прогресса за dig' },
-  accuracy: { name:'Accuracy', base:1, cap:10, desc:'+5% шанс находки N3X' },
-  autodig:  { name:'Autodig',  base:2, cap:10, desc:'5% + 1%/ур. от ручного dig' }
+  speed:    { id:1, name:'Speed',    base:1, cap:10, desc:'−5% времени dig за уровень' },
+  depth:    { id:2, name:'Depth',    base:1, cap:10, desc:'+10% прогресса за dig' },
+  accuracy: { id:3, name:'Accuracy', base:1, cap:10, desc:'+5% шанс находки N3X' },
+  autodig:  { id:4, name:'Autodig',  base:2, cap:10, desc:'5% + 1%/ур. от ручного dig' }
 };
+const SKILL_ORDER = ['speed', 'depth', 'accuracy', 'autodig'];
 
 const MAILS = {
   m1: {
@@ -139,5 +140,5 @@ const DARKNET = {
   ]
 };
 
-window.R00TKITChapter2Data = { CASES, TUTORIAL_CASES, NETWORKS, SKILLS, MAILS, CUTSCENE, DARKNET };
+window.R00TKITChapter2Data = { CASES, TUTORIAL_CASES, NETWORKS, SKILLS, SKILL_ORDER, MAILS, CUTSCENE, DARKNET };
 })();
