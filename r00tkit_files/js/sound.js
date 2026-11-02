@@ -6,7 +6,8 @@
   const valueEl = document.getElementById('vol-val');
   if (!input) return;
 
-  const VOLUME_KEY = 'garage_volume_v1';
+  const VOLUME_KEY = 'r00tkit_volume_v1';
+const LEGACY_VOLUME_KEY = 'garage_volume_v1';
   const DEFAULT_VOLUME = 75;
   const MIN_GAP = 18;      // мс: защита от слишком частого повтора
   const FADE_MS = 900;     // плавная смена музыки
@@ -70,8 +71,16 @@
 
   function readVolume(){
     try {
-      const raw = parseInt(localStorage.getItem(VOLUME_KEY), 10);
-      if (isFinite(raw)) return clamp(raw, 0, 100);
+      const stored = localStorage.getItem(VOLUME_KEY);
+      const legacy = stored == null ? localStorage.getItem(LEGACY_VOLUME_KEY) : null;
+      const raw = parseInt(stored != null ? stored : legacy, 10);
+      if (isFinite(raw)){
+        if (stored == null && legacy != null){
+          localStorage.setItem(VOLUME_KEY, String(clamp(raw, 0, 100)));
+          localStorage.removeItem(LEGACY_VOLUME_KEY);
+        }
+        return clamp(raw, 0, 100);
+      }
     } catch (e) {}
     return DEFAULT_VOLUME;
   }
@@ -276,7 +285,7 @@
     syncVolumeUI();
     applyVolumes();
     if (persist){
-      try { localStorage.setItem(VOLUME_KEY, String(Math.round(master * 100))); } catch (e) {}
+      try { localStorage.setItem(VOLUME_KEY, String(Math.round(master * 100))); localStorage.removeItem(LEGACY_VOLUME_KEY); } catch (e) {}
     }
   }
 
@@ -356,7 +365,7 @@
     }
   }
 
-  window.GarageSound = {
+  window.R00TKITSound = {
     sfx: playSfx,
     music: fadeTo,
     setMode: name => setMode(name),

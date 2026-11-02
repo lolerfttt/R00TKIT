@@ -57,7 +57,7 @@
   <div id="task" hidden></div>
   <div id="notes" aria-live="polite"></div>
   <div id="inputline">
-    <span id="prompt">root@garage:~$</span>
+    <span id="prompt">root@r00tkit:~$</span>
     <input id="cmd" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="команда">
     <div id="volume" title="громкость">
       <span class="vol-label">VOL</span>
@@ -84,6 +84,8 @@
     <svg class="icon icon-team-warning"><use href="#ic-team-warning"/></svg>
   </span>
   <span class="badge badge-skill" id="badge-skill" title="есть очки навыков"><svg class="icon icon-skill"><use href="#ic-skill"/></svg></span>
+  <span class="badge badge-virus" id="badge-virus" title="сеть сгорела"><img class="icon-img" src="icons/virus.svg" alt=""></span>
+  <span class="badge badge-hot" id="badge-hot" title="горячий заказ"><img class="icon-img" src="icons/hot.svg" alt=""></span>
 </div>
 
 <div id="hints" class="off" aria-hidden="true">
@@ -142,19 +144,20 @@
 <script src="js/nick.js"></script>
 <script src="js/sound.js"></script>
 <script src="js/game.js"></script>
+<script src="js/chapter2_data.js"></script>
 <script src="js/chapter2.js"></script>
 <script src="js/intro.js"></script>
 <script>
 // страховка только на случай, если intro.js вообще не загрузился;
 // сам сценарий интро разруливает свои таймауты
 setTimeout(function(){
-  if (window.GarageIntro) return;
+  if (window.R00TKITIntro) return;
   var app = document.getElementById('app');
   if (app && !app.classList.contains('app-ready')) {
     app.classList.add('app-ready');
     var intro = document.getElementById('intro');
     if (intro) { intro.classList.add('hide'); intro.style.display = 'none'; }
-    if (window.Garage && window.Garage.init) window.Garage.init();
+    if (window.R00TKIT && window.R00TKIT.init) window.R00TKIT.init();
   }
 }, 5000);
 </script>

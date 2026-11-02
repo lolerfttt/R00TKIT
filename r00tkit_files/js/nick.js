@@ -1,7 +1,8 @@
 (() => {
 'use strict';
 
-const KEY = 'garage_nick_v1';
+const KEY = 'r00tkit_nick_v1';
+const LEGACY_KEY = 'garage_nick_v1';
 const MAX_RAW = 16;
 const MAX_STORED = 32;
 
@@ -33,7 +34,13 @@ function cleanStored(value){
 
 function read(){
   try {
-    return cleanStored(localStorage.getItem(KEY) || '');
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || '';
+    const nick = cleanStored(raw);
+    if (nick && !localStorage.getItem(KEY)){
+      localStorage.setItem(KEY, nick);
+      localStorage.removeItem(LEGACY_KEY);
+    }
+    return nick;
   } catch (e) {
     return '';
   }
@@ -44,6 +51,7 @@ function write(value){
   if (!nick) return false;
   try {
     localStorage.setItem(KEY, nick);
+    try { localStorage.removeItem(LEGACY_KEY); } catch(e){}
     return true;
   } catch (e) {
     return false;
@@ -51,7 +59,7 @@ function write(value){
 }
 
 function clear(){
-  try { localStorage.removeItem(KEY); } catch (e) {}
+  try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch (e) {}
 }
 
 function validate(value){
@@ -104,7 +112,7 @@ function makeLeet(value){
   return out;
 }
 
-window.GarageNick = {
+window.R00TKITNick = {
   KEY,
   read,
   write,

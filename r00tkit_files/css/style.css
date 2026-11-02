@@ -39,6 +39,8 @@
   #hud span{white-space:nowrap;}
   #hud .v{color:var(--g-bright);}
   #hud .sep{color:#145c2b;}
+  body.chapter2 #hud .sep{display:none;}
+  body.chapter2 #hud{gap:4px 18px;}
   #hud #h-lvl .pts{color:#eafff0;text-shadow:0 0 9px rgba(51,255,119,.65);}
   #hud #h-heat.hot{color:#ff5a5a;text-shadow:0 0 9px rgba(255,0,0,.55);}
   #log{
@@ -112,6 +114,11 @@
   .badge-team.warn .icon-team-plus{display:none;}
   .badge-team.warn .icon-team-warning{display:block;}
   .badge-skill{filter:drop-shadow(0 0 6px rgba(51,255,119,.55));}
+  .icon-img{display:block;width:30px;height:30px;}
+  .badge-virus .icon-img{filter:brightness(0) saturate(100%) invert(42%) sepia(92%) saturate(2800%) hue-rotate(340deg) brightness(95%) contrast(95%);}
+  .badge-virus.on{animation-duration:1.4s;}
+  .badge-hot .icon-img{filter:brightness(0) saturate(100%) invert(82%) sepia(52%) saturate(800%) hue-rotate(1deg) brightness(102%);}
+  .badge-hot.on{animation-duration:1.8s;}
   @keyframes badgeBlink{0%,100%{opacity:1;}50%{opacity:.2;}}
 
   /* ---------- choice.exe: окно консоли Windows ---------- */

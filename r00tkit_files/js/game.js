@@ -1,17 +1,19 @@
 (() => {
 'use strict';
 
-const SAVE_KEY = 'garage_idle_v1';
-const NICK_KEY = 'garage_nick_v1';
+const SAVE_KEY = 'r00tkit_save_v2';
+const LEGACY_SAVE_KEY = 'garage_idle_v1';
+const NICK_KEY = 'r00tkit_nick_v1';
+const LEGACY_NICK_KEY = 'garage_nick_v1';
 const readNick = () => {
-  if (window.GarageNick && typeof window.GarageNick.read === 'function') return window.GarageNick.read();
-  try { return String(localStorage.getItem(NICK_KEY) || '').trim().toLowerCase(); }
+  if (window.R00TKITNick && typeof window.R00TKITNick.read === 'function') return window.R00TKITNick.read();
+  try { return String(localStorage.getItem(NICK_KEY) || localStorage.getItem(LEGACY_NICK_KEY) || '').trim().toLowerCase(); }
   catch(e){ return ''; }
 };
 function adoptNick(value){
   const raw = String(value || '').trim().toLowerCase();
   if (!raw) return;
-  if (window.GarageNick && typeof window.GarageNick.write === 'function') window.GarageNick.write(raw);
+  if (window.R00TKITNick && typeof window.R00TKITNick.write === 'function') window.R00TKITNick.write(raw);
   else { try { localStorage.setItem(NICK_KEY, raw); } catch(e){} }
   S.nick = readNick() || raw;
 }
@@ -30,11 +32,13 @@ const choiceInput = $('choice-cmd');
 const badgeMail = $('badge-mail');
 const badgeTeam = $('badge-team');
 const badgeSkill = $('badge-skill');
+const badgeVirus = $('badge-virus');
+const badgeHot = $('badge-hot');
 const badgesEl = $('badges');
 const netBadge = $('netbadge');
 
 const STAGES = [
-  { name:'ГАРАЖ',       host:'garage',  cost:0,        mult:1,   slots:1,  lore:'бетон, паяльник и один ноут.' },
+  { name:'ГАРАЖ',       host:'home',    cost:0,        mult:1,   slots:1,  lore:'бетон, паяльник и один ноут.' },
   { name:'КВАРТИРА',    host:'flat',    cost:5000,     mult:1.5, slots:2, lore:'съёмная студия. соседи ничего не слышат.' },
   { name:'ДАТА-ЦЕНТР',  host:'dc',      cost:3000000,  mult:3.2, slots:4, lore:'сотни стоек. охлаждение гудит как море.' },
 ];
@@ -220,12 +224,16 @@ function newState(){
     story:0, mailRead:false, choiceOpened:false, choiceResult:'', choiceAt:0,
     tone:'', finished:'', flags:{ backdoor:false, joined:false },
     tutorialDone:false, tutorialStep:0, showHints:false, teamAlert:false,
-    chapter2:false, ch2:null, ch2Mail:{ m1:false, m2:false, m3:false },
     nick:readNick()
   };
 }
 
-let S = newState();
+function newRun(){
+  return { v:2, chapter:1, ch1:newState(), ch2:null, savedAt:0 };
+}
+
+let RUN = newRun();
+let S = RUN.ch1;
 let booted = false;
 let uiReady = false;
 let hasSave = false;
@@ -260,8 +268,8 @@ const CUT_GLITCH = ['#','@','%','&','_','0','1','x','§','▓','░','?','!'];
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const sfx = name => { if (window.GarageSound) window.GarageSound.sfx(name); };
-const music = name => { if (window.GarageSound) { window.GarageSound.setMode(name); window.GarageSound.music(name); } };
+const sfx = name => { if (window.R00TKITSound) window.R00TKITSound.sfx(name); };
+const music = name => { if (window.R00TKITSound) { window.R00TKITSound.setMode(name); window.R00TKITSound.music(name); } };
 
 function fmt(n){
   if (!isFinite(n)) return '∞';
@@ -385,14 +393,22 @@ function heatGain(t){
 
 /* ---------- уведомления слева ---------- */
 
-function note(text, cls = '', ms = 14000){
+const noteQueue = [];
+function drainNotes(){
+  if (!notesEl) return;
+  while (notesEl.childElementCount < 3 && noteQueue.length){
+    const n = noteQueue.shift();
+    const d = document.createElement('div');
+    d.className = 'note' + (n.cls ? ' ' + n.cls : '');
+    d.textContent = n.text;
+    notesEl.appendChild(d);
+    setTimeout(() => { d.remove(); drainNotes(); }, n.ms);
+  }
+}
+function note(text, cls = '', ms = 6000){
   if (!notesEl || cutscene.active || panic || transitioning) return;
-  const d = document.createElement('div');
-  d.className = 'note' + (cls ? ' ' + cls : '');
-  d.textContent = text;
-  notesEl.appendChild(d);
-  while (notesEl.childElementCount > 3) notesEl.firstElementChild.remove();
-  setTimeout(() => d.remove(), ms);
+  noteQueue.push({ text, cls, ms });
+  drainNotes();
 }
 
 /* ---------- редкие цели ---------- */
@@ -616,15 +632,36 @@ function echo(line){
 }
 
 function updatePrompt(){
-  promptEl.textContent = `root@${S.nick || 'garage'}:~$`;
+  promptEl.textContent = `root@${S.nick || 'r00tkit'}:~$`;
 }
 
 /* ---------- сохранение ---------- */
 
+function runSnapshot(){
+  if (RUN.chapter === 2) RUN.ch2 = S;
+  else RUN.ch1 = S;
+  return {
+    v: 2,
+    chapter: RUN.chapter === 2 ? 2 : 1,
+    ch1: RUN.ch1,
+    ch2: RUN.ch2,
+    savedAt: Date.now()
+  };
+}
+
+function persistLocal(){
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(runSnapshot()));
+    localStorage.removeItem(LEGACY_SAVE_KEY);
+    localStorage.removeItem(LEGACY_RESET_KEY);
+  } catch(e){}
+}
+
 function save(quiet = true){
   if (!S.started) return;
   S.lastSave = Date.now();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  RUN.savedAt = S.lastSave;
+  persistLocal();
   try { localStorage.removeItem(RESET_KEY); } catch(e){}
   queueExternalSave();
   if (!quiet) out('[SAVE] сессия сохранена.', 'dim');
@@ -632,7 +669,7 @@ function save(quiet = true){
 
 function readSave(){
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY);
     if (!raw) return null;
     const d = JSON.parse(raw);
     return (d && typeof d === 'object') ? d : null;
@@ -641,12 +678,13 @@ function readSave(){
 
 /* ---------- сохранение: внешний бэкап и перенос ---------- */
 
-const RESET_KEY = 'garage_reset_v1';
+const RESET_KEY = 'r00tkit_reset_v1';
+const LEGACY_RESET_KEY = 'garage_reset_v1';
 const SAVE_FILE = 'r00tkit-save.json';
 const SAVE_DB = 'r00tkit_fs';
 const SAVE_STORE = 'handles';
 const SAVE_DIR_KEY = 'save-dir';
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 let saveDirHandle = null;
 let saveDirStatus = 'off';
@@ -659,7 +697,7 @@ function savePayload(){
     version: SAVE_VERSION,
     savedAt: Date.now(),
     nick: readNick() || S.nick || '',
-    state: S
+    state: runSnapshot()
   };
 }
 
@@ -687,11 +725,13 @@ function normalizePayload(data){
 }
 
 function payloadTime(p){
+  const st = p && p.state;
+  if (st && st.v === 2) return Number(st.savedAt) || Number(st.ch2 && st.ch2.lastSave) || Number(st.ch1 && st.ch1.lastSave) || 0;
   return Number(p && p.state && p.state.lastSave) || Number(p && p.savedAt) || 0;
 }
 
 function resetStamp(){
-  try { return Number(localStorage.getItem(RESET_KEY)) || 0; }
+  try { return Number(localStorage.getItem(RESET_KEY) || localStorage.getItem(LEGACY_RESET_KEY)) || 0; }
   catch(e){ return 0; }
 }
 
@@ -853,10 +893,10 @@ async function initExternalSave(){
     if (!ext || !ext.state || shouldIgnoreExternal(ext)) return false;
 
     const local = readSave();
-    if (!local || payloadTime(ext) > (Number(local.lastSave) || 0) + 800){
+    if (!local || payloadTime(ext) > payloadTime({state:local}) + 800){
       hydrate(ext.state);
       if (ext.nick) adoptNick(ext.nick);
-      try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+      persistLocal();
       externalLoaded = true;
       return true;
     }
@@ -880,16 +920,28 @@ async function connectExternalSave(root){
   if (!ext || !ext.state || shouldIgnoreExternal(ext)) return false;
 
   const local = readSave();
-  if (local && payloadTime(ext) <= (Number(local.lastSave) || 0) + 800) return false;
+  if (local && payloadTime(ext) <= payloadTime({state:local}) + 800) return false;
 
   hydrate(ext.state);
   if (ext.nick) adoptNick(ext.nick);
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  persistLocal();
   hasSave = true;
   return true;
 }
 
 function applyLoadedState(){
+  if (RUN.chapter === 2){
+    booted = true;
+    hud.style.display = 'flex';
+    updatePrompt();
+    logEl.innerHTML = '';
+    jobEl = null; phraseEl = null;
+    document.body.classList.add('chapter2');
+    if (window.R00TKITChapter2) window.R00TKITChapter2.start();
+    renderHUD();
+    save(true);
+    return;
+  }
   if (S.started) applyOffline();
   if (menuEl) menuEl.remove();
   menuEl = null; menuKind = null; menuRender = null;
@@ -920,7 +972,7 @@ function applyLoadedState(){
 function applyImportedSave(payload, stayInMenu){
   hydrate(payload.state || payload);
   if (payload.nick) adoptNick(payload.nick);
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){}
+  persistLocal();
   hasSave = true;
   if (stayInMenu && !booted){
     if (S.started) applyOffline();
@@ -1056,7 +1108,7 @@ async function cmdSaves(args){
     const ext = await readExternalSave();
     if (ext && ext.state && !shouldIgnoreExternal(ext)){
       const local = readSave();
-      if (!local || payloadTime(ext) > (Number(local.lastSave) || 0) + 800){
+      if (!local || payloadTime(ext) > payloadTime({state:local}) + 800){
         applyImportedSave(ext, !booted);
         loaded = true;
       }
@@ -1130,7 +1182,7 @@ async function cmdSaves(args){
 }
 
 
-function hydrate(d){
+function hydrateCh1(d){
   S = Object.assign(newState(), d || {});
   S.up = Object.assign({ cpu:0, ram:0, gpu:0, vpn:0, bot:0, ai:0 }, d && d.up || {});
   S.skills = Object.assign({ speed:0, profit:0, stealth:0, auto:0 }, d && d.skills || {});
@@ -1172,8 +1224,7 @@ function hydrate(d){
   S.finished = typeof S.finished === 'string' ? S.finished : '';
   S.flags = Object.assign({ backdoor:false, joined:false }, d && d.flags || {});
   S.teamAlert = !!(d && d.teamAlert);
-  S.chapter2 = !!S.chapter2;
-  S.ch2Mail = Object.assign({ m1:false, m2:false, m3:false }, d && d.ch2Mail || {});
+  S.ch2Mail = Object.assign({ m3:false }, d && d.ch2Mail || {});
   if (S.choiceResult) S.choiceOpened = true;
   S.phraseIn = (isFinite(Number(S.phraseIn)) && Number(S.phraseIn) >= 0)
     ? Math.floor(Number(S.phraseIn))
@@ -1199,6 +1250,63 @@ function hydrate(d){
   if (!S.job) S.phrase = null;
 }
 
+function migrateOldChapter2(d){
+  const ch2 = window.R00TKITChapter2 ? window.R00TKITChapter2.createState() : {};
+  ch2.started = true;
+  ch2.nick = readNick() || (d && d.nick) || '';
+  ch2.introSeen = false;
+  ch2.legacy = {
+    chapter1Earned: Math.max(0, Number(d && d.earned) || 0),
+    chapter1Hacks: Math.max(0, Number(d && d.hacks) || 0),
+    archivedAt: Date.now(),
+    oldChapter2: true
+  };
+  return { v:2, chapter:2, ch1:null, ch2 };
+}
+
+function hydrate(d){
+  if (!d){
+    RUN = newRun();
+    S = RUN.ch1;
+    return;
+  }
+
+  if (d.v === 2 && d.ch1 !== undefined){
+    RUN = {
+      v: 2,
+      chapter: d.chapter === 2 ? 2 : 1,
+      ch1: d.ch1 || null,
+      ch2: d.ch2 || null,
+      savedAt: Number(d.savedAt) || 0
+    };
+    if (RUN.chapter === 2){
+      if (!RUN.ch2 && window.R00TKITChapter2) RUN.ch2 = window.R00TKITChapter2.createState();
+      S = RUN.ch2 || newState();
+      S.started = true;
+      S.nick = readNick() || S.nick || '';
+      if (window.R00TKITChapter2 && window.R00TKITChapter2.normalizeState){
+        RUN.ch2 = window.R00TKITChapter2.normalizeState(S);
+        S = RUN.ch2;
+      }
+    } else {
+      if (!RUN.ch1) RUN.ch1 = newState();
+      hydrateCh1(RUN.ch1);
+      RUN.ch1 = S;
+    }
+    return;
+  }
+
+  if (d.chapter2){
+    RUN = migrateOldChapter2(d);
+    S = RUN.ch2;
+    return;
+  }
+
+  RUN = { v:2, chapter:1, ch1:null, ch2:null, savedAt:0 };
+  hydrateCh1(d);
+  RUN.ch1 = S;
+}
+
 function applyOffline(){
   if (!S.started || !S.lastSave) return;
   const el = clamp((Date.now() - S.lastSave) / 1000, 0, 8 * 3600);
@@ -1214,14 +1322,17 @@ function applyOffline(){
 
 function renderHUD(){
   if (!booted) return;
-  if (S.chapter2){
-    const c = S.ch2 || {};
-    $('h-loc').textContent = 'ТИХАЯ КОМНАТА';
-    $('h-money').textContent = '$' + fmtHud(S.money);
-    $('h-inc').textContent = 'TRUST ' + Math.round(Number(c.trust) || 0);
-    $('h-lvl').textContent = 'ОП ' + (Number(c.done) || 0);
-    $('h-xp').textContent = 'ГЛАВА 2';
-    $('h-heat').textContent = 'ONLINE';
+  if (RUN.chapter === 2){
+    const c = S || {};
+    const rate = Number(c.virusRate) || 0;
+    const t = c.case;
+    const p = t ? clamp((Number(t.progress) || 0) / (Number(t.need) || 1), 0, 1) : 0;
+    $('h-loc').textContent = 'N3X: ' + (Number(c.n3x) || 0).toFixed(1);
+    $('h-money').textContent = 'Points: ' + (Number(c.sp) || 0);
+    $('h-inc').textContent = 'VIRUS: ' + (Number(c.virusInfected) || 0) + ' / +' + rate.toFixed(2) + ' points/s';
+    $('h-lvl').textContent = t ? `info ${bar(p, 14)} ${Math.floor(t.progress)}/${t.need}` : 'info [--------------] —';
+    $('h-xp').textContent = '';
+    $('h-heat').textContent = '';
     $('h-heat').classList.remove('hot');
     return;
   }
@@ -1238,18 +1349,50 @@ function renderHUD(){
 
 function updateBadges(){
   const on = booted && !cutscene.active && !panic;
-  if (badgesEl) badgesEl.classList.toggle('on', on);
-  if (netBadge) netBadge.classList.toggle('on', on);
-  if (badgeMail) badgeMail.classList.toggle('on', on && (S.mails || []).some(m => !m.read));
-  if (badgeTeam) {
-    const offers = on && (S.offers || []).length > 0 && S.crew.length < stage().slots;
-    badgeTeam.classList.toggle('on', offers || (on && !!S.teamAlert));
-    badgeTeam.classList.toggle('warn', on && !!S.teamAlert);
+  const ch2 = RUN.chapter === 2;
+  let mail = false, team = false, warn = false, skill = false, virus = false, hot = false;
+  if (ch2){
+    mail = !!(S.mail && S.mail.items && S.mail.items.some(m => !m.read));
+    skill = (Number(S.sp) || 0) > 0;
+    virus = !!S.burnAlert;
+    hot = !!(S.darknet && S.darknet.hot);
+  } else {
+    mail = (S.mails || []).some(m => !m.read);
+    const offers = (S.offers || []).length > 0 && S.crew.length < stage().slots;
+    team = offers || !!S.teamAlert;
+    warn = !!S.teamAlert;
+    skill = S.points > 0;
   }
-  if (badgeSkill) badgeSkill.classList.toggle('on', on && S.points > 0);
+  if (badgesEl) badgesEl.classList.toggle('on', on && (mail || team || skill || virus || hot));
+  if (netBadge) netBadge.classList.toggle('on', on);
+  if (badgeMail) badgeMail.classList.toggle('on', on && mail);
+  if (badgeTeam) {
+    badgeTeam.classList.toggle('on', on && team);
+    badgeTeam.classList.toggle('warn', on && warn);
+  }
+  if (badgeSkill) badgeSkill.classList.toggle('on', on && skill);
+  if (badgeVirus) badgeVirus.classList.toggle('on', on && virus);
+  if (badgeHot) badgeHot.classList.toggle('on', on && hot);
 }
 
 /* ---------- игровой цикл ---------- */
+
+function checkChapter1Mail(){
+  if (!S || RUN.chapter !== 1 || !S.started || S.finished) return;
+  if (!S.story) return;
+  if (!S.ch2Mail || typeof S.ch2Mail !== 'object') S.ch2Mail = {};
+  if (!S.ch2Mail.m3 && S.earned >= 10000000){
+    S.ch2Mail.m3 = true;
+    if (!S.mails.some(m => m.attachment === 'data.txt')){
+      addMail(storyMail(
+        'НУЖНО БЕЖАТЬ',
+        'НУЖНО БЕЖАТЬ! Я вижу что ОНИ уже вычислили тебя, тебе надо бежать, я в файле лежат координаты, качай на флешку, бери ноут и вали. там же лежит билет, скачай на телефон, в аэропорту покажешь qr-код. не спрашивай куда, так нужно',
+        'data.txt'
+      ));
+    }
+    save(true);
+  }
+}
 
 function tick(){
   const now = Date.now();
@@ -1257,13 +1400,13 @@ function tick(){
   lastTick = now;
   dt = clamp(dt, 0, 120);
 
-  if (booted && S.chapter2){
-    if (window.GarageChapter2) window.GarageChapter2.tick();
+  if (booted && RUN.chapter === 2){
+    if (window.R00TKITChapter2) window.R00TKITChapter2.tick(dt);
     renderHUD();
     updateBadges();
     return;
   }
-  if (booted && window.GarageChapter2) window.GarageChapter2.tickChapter1();
+  if (booted && RUN.chapter === 1) checkChapter1Mail();
 
   if (booted && !cutscene.active && !transitioning){
     S.playTime += dt;
@@ -1804,13 +1947,13 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v1.1'),
+  artLine('prod by 3percent · v2.0'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
 
 function menu(){
-  if (S.chapter2 && window.GarageChapter2){ window.GarageChapter2.menu(); return; }
+  if (RUN.chapter === 2 && window.R00TKITChapter2){ window.R00TKITChapter2.menu(); return; }
   logEl.innerHTML = '';
   jobEl = null;
   menuEl = null;
@@ -1842,21 +1985,26 @@ async function intro(){
 }
 
 async function cmdStart(){
+  if (S.finished === 'prison' && window.R00TKITChapter2 && RUN.chapter === 1){
+    window.R00TKITChapter2.handle('start', [], 'start');
+    return;
+  }
   if (S.finished){ renderFinal(); return; }
   if (booted){
     out('система уже запущена. status — состояние.', 'dim');
     return;
   }
-  if (S.chapter2 && window.GarageChapter2){
+  if (RUN.chapter === 2 && window.R00TKITChapter2){
     S.nick = readNick() || S.nick;
     booted = true;
     S.started = true;
     S.showHints = false;
     S.lastSave = Date.now();
+    document.body.classList.add('chapter2');
     music('gameplay');
     hud.style.display = 'flex';
     updatePrompt();
-    window.GarageChapter2.start();
+    window.R00TKITChapter2.start();
     renderHUD();
     save(true);
     return;
@@ -1898,6 +2046,85 @@ async function cmdStart(){
   updateTutorialUI();
   renderHUD();
   save(true);
+}
+
+function newTestCh1(){
+  const st = newState();
+  st.started = true;
+  st.tutorialDone = true;
+  st.tutorialStep = 8;
+  st.story = 1;
+  st.money = 1000;
+  st.earned = 1000;
+  st.nick = readNick() || st.nick;
+  st.showHints = false;
+  return st;
+}
+
+function bootChapter(){
+  S.started = true;
+  S.showHints = false;
+  booted = true;
+  document.body.classList.toggle('chapter2', RUN.chapter === 2);
+  music('gameplay');
+  hud.style.display = 'flex';
+  updatePrompt();
+  renderHUD();
+  input.disabled = false;
+  input.focus();
+}
+
+function switchChapter(ch, opts = {}){
+  ch = ch === 2 ? 2 : 1;
+  if (ch === 2 && !window.R00TKITChapter2){ out('глава 2 не загружена.', 'err'); return; }
+  save(true);
+
+  if (ch === 2){
+    if (opts.nextState) RUN.ch2 = opts.nextState;
+    else if (opts.fresh || !RUN.ch2) RUN.ch2 = window.R00TKITChapter2.createState();
+    RUN.chapter = 2;
+    S = RUN.ch2;
+  } else {
+    if (opts.fresh || !RUN.ch1) RUN.ch1 = newTestCh1();
+    else { hydrateCh1(RUN.ch1); RUN.ch1 = S; }
+    RUN.chapter = 1;
+    S = RUN.ch1;
+  }
+  if (opts.wipeCh1) RUN.ch1 = null;
+
+  S.started = true;
+  S.nick = S.nick || readNick();
+  S.showHints = false;
+
+  booted = false;
+  cutscene.active = false;
+  stopNickGlitch();
+  transitioning = false;
+  panic = null;
+  choiceMode = null;
+  if (choiceEl) choiceEl.classList.remove('on');
+  document.body.classList.remove('choice-open', 'panic', 'cutscene', 'cut-flicker');
+  if (panicEl){ panicEl.classList.remove('on', 'fail'); panicEl.setAttribute('aria-hidden', 'true'); }
+  if (window.R00TKITChapter2) window.R00TKITChapter2.resetMail();
+  input.disabled = false;
+  jobEl = null;
+  phraseEl = null;
+  offlineInfo = null;
+  hud.style.display = 'none';
+  clearConsole();
+  document.body.classList.toggle('chapter2', RUN.chapter === 2);
+  updatePrompt();
+  applyHints();
+  if (opts.autoStart !== false){
+    cmdStart();
+  } else {
+    menu();
+    persistLocal();
+  }
+}
+
+function restartChapter2(){
+  switchChapter(2, { fresh: true, autoStart: true });
 }
 
 /* ---------- катсцена: unknown ---------- */
@@ -1986,7 +2213,7 @@ async function cutLine(who, text, token, cls = '', name = ''){
     if (!cutAlive(token)) return;
     body.textContent += ch;
     scrollBottom(true);
-    if (window.GarageSound && window.GarageSound.type) window.GarageSound.type(ch);
+    if (window.R00TKITSound && window.R00TKITSound.type) window.R00TKITSound.type(ch);
     let delay = base * (0.92 + Math.random() * 0.18);
     if (ch === ' ') delay += base * 0.12;
     else if ('.!?…'.includes(ch)) delay += base * 1.6;
@@ -2089,7 +2316,7 @@ function startStory(force = false){
   scheduleNickGlitch(token);
 
   // 500k: музыка стоп, глитч, затем трек катсцены
-  const sound = window.GarageSound;
+  const sound = window.R00TKITSound;
   if (sound){
     sound.stop();
     sound.sfx('glitch');
@@ -2808,7 +3035,7 @@ function cmdCool(){
 }
 
 function adminPanel(){
-  if (S.chapter2) return adminPanel2();
+  if (RUN.chapter === 2) return adminPanel2();
   out('АДМИН-ПАНЕЛЬ', 'head');
   out('');
   out('  admin money <n>    баланс (+/-)');
@@ -2835,11 +3062,9 @@ function adminPanel(){
 function adminPanel2(){
   out('АДМИН-ПАНЕЛЬ · ГЛАВА 2', 'head');
   out('');
-  out('  admin money <n>    баланс (+/-)');
-  out('  admin trust <n>    доверие 0..100');
-  out('  admin ops <n>      число завершённых операций');
+  out('  admin n3x <n>      N3X (+/-)');
   out('  admin sp <n>       очки навыков');
-  out('  admin reset        начать главу 2 заново');
+  out('  admin virus <pc> <rate>   VIRUS');
   out('  admin chapter 1|2  переключить главу');
   out('  admin wipe         полный сброс (как первый запуск)');
   out('');
@@ -2849,38 +3074,32 @@ function adminChapter(arg){
   const ch = parseInt(arg, 10);
   if (ch !== 1 && ch !== 2){ out('[ADMIN] admin chapter 1|2', 'err'); return; }
   if (!booted){ out('[ADMIN] сначала start.', 'err'); return; }
-  if (!window.GarageChapter2){ out('[ADMIN] глава 2 не загружена.', 'err'); return; }
-  if (ch === 1 && !S.chapter2){ out('[ADMIN] ты уже в главе 1.', 'dim'); return; }
-  if (ch === 2) window.GarageChapter2.adminEnter();
-  else window.GarageChapter2.adminExit();
+  switchChapter(ch, { fresh: ch === 2 });
 }
 
-function cmdAdmin2(a, raw, n){
-  const c = S.ch2 || {};
+function cmdAdmin2(a, raw, n, args){
+  const c = S;
+  args = args || [];
   switch(a){
-    case 'money':
-      if (!isFinite(n)){ out('admin money <n>', 'err'); return; }
-      S.money = Math.max(0, S.money + n);
-      out(`[ADMIN] баланс: $${fmt(S.money)}`, 'ok');
-      break;
-    case 'trust':
-      if (!isFinite(n)){ out('admin trust <n>', 'err'); return; }
-      c.trust = clamp(n, 0, 100);
-      out(`[ADMIN] доверие: ${Math.round(c.trust)}`, 'ok');
-      break;
-    case 'ops':
-      if (!isFinite(n)){ out('admin ops <n>', 'err'); return; }
-      c.done = Math.max(0, Math.floor(n));
-      out(`[ADMIN] операций: ${c.done}`, 'ok');
+    case 'n3x':
+      if (!isFinite(n)){ out('admin n3x <n>', 'err'); return; }
+      c.n3x = Math.max(0, c.n3x + n);
+      out(`[ADMIN] N3X: ${c.n3x.toFixed(1)}`, 'ok');
       break;
     case 'sp':
       if (!isFinite(n)){ out('admin sp <n>', 'err'); return; }
       c.sp = Math.max(0, Math.floor(n));
-      out(`[ADMIN] очки навыков: ${c.sp}`, 'ok');
+      out(`[ADMIN] Points: ${c.sp}`, 'ok');
       break;
-    case 'reset':
-      window.GarageChapter2.adminEnter();
-      return;
+    case 'virus': {
+      const pc = parseInt(raw, 10);
+      const rate = parseFloat(args[2]);
+      if (!isFinite(pc)){ out('admin virus <pc> <rate>', 'err'); return; }
+      c.virusInfected = Math.max(0, pc);
+      if (isFinite(rate)) c.virusRate = Math.max(0, rate);
+      out(`[ADMIN] VIRUS: ${c.virusInfected} · +${c.virusRate.toFixed(2)}/s`, 'ok');
+      break;
+    }
     case 'chapter':
       adminChapter(raw);
       return;
@@ -2924,7 +3143,7 @@ function cmdAdmin(args){
   const raw = args[1];
   const n = parseAmount(raw);
 
-  if (S.chapter2) return cmdAdmin2(a, raw, n);
+  if (RUN.chapter === 2) return cmdAdmin2(a, raw, n, args);
 
   switch(a){
     case 'money':
@@ -3061,7 +3280,7 @@ async function adminWipe(){
     const keys = [];
     for (let i = 0; i < localStorage.length; i++){
       const key = localStorage.key(i);
-      if (key && key.indexOf('garage_') === 0) keys.push(key);
+      if (key && (key.indexOf('r00tkit_') === 0 || key.indexOf('garage_') === 0)) keys.push(key);
     }
     for (const key of keys) localStorage.removeItem(key);
     // страховка от старого внешнего сейва, если удалить файл не удалось
@@ -3076,10 +3295,11 @@ function cmdReset(arg){
     out('это удалит весь прогресс. введи: reset confirm', 'err');
     return;
   }
-  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+  try { localStorage.removeItem(SAVE_KEY); localStorage.removeItem(LEGACY_SAVE_KEY); } catch(e){}
   try { localStorage.setItem(RESET_KEY, String(Date.now())); } catch(e){}
   removeExternalSave();
-  S = newState();
+  RUN = { v:2, chapter:1, ch1:newState(), ch2:null, savedAt:0 };
+  S = RUN.ch1;
   adminUnlocked = false;
   cutscene.token++;
   cutscene.active = false;
@@ -3091,7 +3311,7 @@ function cmdReset(arg){
   if (choiceEl) choiceEl.classList.remove('on');
   document.body.classList.remove('choice-open');
   input.disabled = false;
-  document.body.classList.remove('cutscene', 'cut-flicker');
+  document.body.classList.remove('cutscene', 'cut-flicker', 'chapter2');
   booted = false;
   hasSave = false;
   offlineInfo = null;
@@ -3158,6 +3378,11 @@ function run(line){
     return;
   }
 
+  if (cmd === 'chapter' && (args[0] === '1' || args[0] === '2')){
+    switchChapter(Number(args[0]));
+    return;
+  }
+
   if (panic && !['wipe','purge'].includes(cmd)){
     sfx('ui_error');
     out('НЕ ВРЕМЯ. СТИРАЙ ДАННЫЕ: wipe', 'err');
@@ -3174,7 +3399,7 @@ function run(line){
     return;
   }
 
-  if (window.GarageChapter2 && window.GarageChapter2.handle(cmd, args, line)) return;
+  if (window.R00TKITChapter2 && window.R00TKITChapter2.handle(cmd, args, line)) return;
 
   if (cmd === 'mail' && S.story === 0 && !S.mails.length){
     out('[MAIL] почта пуста.', 'dim');
@@ -3322,23 +3547,30 @@ async function initUI(){
   }
   await initExternalSave();
   if (externalLoaded) hasSave = true;
-  if (hasSave) applyOffline();
+  if (hasSave) { if (RUN.chapter === 1) applyOffline(); }
   uiReady = true;
   S.nick = readNick() || S.nick;
   S.showHints = false;
   applyHints();
   updateTutorialUI();
+  document.body.classList.toggle('chapter2', RUN.chapter === 2);
   menu();
   updatePrompt();
   renderHUD();
   input.focus();
 }
 
-window.Garage = { init: initUI };
+window.R00TKIT = { init: initUI };
 
-window.GarageCore = {
+window.R00TKITCore = {
   get state(){ return S; },
-  setState(next){ S = next; },
+  get run(){ return RUN; },
+  get chapter(){ return RUN.chapter; },
+  setState(next){
+    if (RUN.chapter === 2) RUN.ch2 = next;
+    else RUN.ch1 = next;
+    S = next;
+  },
   newState: () => newState(),
   readNick: () => readNick(),
   out, outHTML, outTyped, clearConsole,
@@ -3349,7 +3581,11 @@ window.GarageCore = {
   save: () => save(true),
   hideHints(){ hintsEl.classList.add('off'); },
   setTask(text){ taskEl.hidden = !text; taskEl.textContent = text || ''; },
-  focusInput(){ input.disabled = false; input.focus(); }
+  focusInput(){ input.disabled = false; input.focus(); },
+  disableInput(){ input.disabled = true; input.blur(); },
+  enableInput(){ input.disabled = false; },
+  cutsceneActive(){ return !!cutscene.active; },
+  switchChapter, bootChapter, restartChapter2
 };
 
 setInterval(tick, 100);

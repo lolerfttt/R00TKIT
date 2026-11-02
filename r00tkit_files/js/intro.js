@@ -6,7 +6,7 @@ const log = document.getElementById('intro-log');
 const app = document.getElementById('app');
 if (!intro || !log || !app) return;
 
-const Nick = window.GarageNick;
+const Nick = window.R00TKITNick;
 const welcome = document.getElementById('welcome');
 const welcomeVol = document.getElementById('welcome-vol');
 const welcomeVal = document.getElementById('welcome-vol-val');
@@ -23,7 +23,7 @@ let hardCap = null;
 let fallback = null;
 let skipBound = false;
 
-window.GarageIntro = {
+window.R00TKITIntro = {
   get waitingForNick(){ return waitingForNick; },
   get done(){ return done; },
   makeLeet: value => Nick ? Nick.makeLeet(value) : String(value || '')
@@ -51,7 +51,7 @@ async function type(el, text, base = 100, jitter = 40){
   for (const ch of text){
     if (skipped) return;
     el.textContent += ch;
-    if (window.GarageSound && window.GarageSound.type) window.GarageSound.type(ch);
+    if (window.R00TKITSound && window.R00TKITSound.type) window.R00TKITSound.type(ch);
     let d = base + rnd(-jitter, jitter);
     if (ch === ' ' || ch === '_' || ch === '.' || ch === '@') d += rnd(20, 60);
     if (Math.random() < 0.045) d += rnd(70, 150);
@@ -66,7 +66,7 @@ async function typeMasked(el, n){
   for (let i = 0; i < n; i++){
     if (skipped) return;
     el.textContent += '*';
-    if (window.GarageSound && window.GarageSound.type) window.GarageSound.type('*');
+    if (window.R00TKITSound && window.R00TKITSound.type) window.R00TKITSound.type('*');
     let d = rnd(52, 95);
     if (Math.random() < 0.07) d += rnd(70, 130);
     await sleep(d);
@@ -105,11 +105,11 @@ function finish(){
   clearTimeout(hardCap);
   clearTimeout(fallback);
   unbindSkip();
-  if (window.GarageSound && window.GarageSound.sfx) window.GarageSound.sfx('enter');
+  if (window.R00TKITSound && window.R00TKITSound.sfx) window.R00TKITSound.sfx('enter');
   intro.classList.remove('nick-mode');
   intro.classList.add('hide');
   app.classList.add('app-ready');
-  if (window.Garage && typeof window.Garage.init === 'function') window.Garage.init();
+  if (window.R00TKIT && typeof window.R00TKIT.init === 'function') window.R00TKIT.init();
   setTimeout(() => { intro.style.display = 'none'; }, 450);
 }
 
@@ -127,10 +127,10 @@ function welcomeGate(){
       const n = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
       if (welcomeVol) welcomeVol.value = String(n);
       if (welcomeVal) welcomeVal.textContent = String(n);
-      if (window.GarageSound && window.GarageSound.setVolume) window.GarageSound.setVolume(n);
+      if (window.R00TKITSound && window.R00TKITSound.setVolume) window.R00TKITSound.setVolume(n);
     };
 
-    apply(window.GarageSound && window.GarageSound.getVolume ? window.GarageSound.getVolume() : 75);
+    apply(window.R00TKITSound && window.R00TKITSound.getVolume ? window.R00TKITSound.getVolume() : 75);
     if (welcomeVol) welcomeVol.addEventListener('input', () => apply(welcomeVol.value));
 
     welcome.hidden = false;
@@ -144,7 +144,7 @@ function welcomeGate(){
       if (welcomeGo) welcomeGo.removeEventListener('click', close);
       document.removeEventListener('keydown', close);
       welcome.hidden = true;
-      if (window.GarageSound && window.GarageSound.music) window.GarageSound.music('menu');
+      if (window.R00TKITSound && window.R00TKITSound.music) window.R00TKITSound.music('menu');
       resolve();
     };
 
@@ -197,7 +197,7 @@ async function askNick(){
     input.addEventListener('keydown', e => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Backspace' || e.key.length === 1){
-        if (window.GarageSound && window.GarageSound.type) window.GarageSound.type(e.key);
+        if (window.R00TKITSound && window.R00TKITSound.type) window.R00TKITSound.type(e.key);
       }
     });
 

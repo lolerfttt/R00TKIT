@@ -1,169 +1,797 @@
 (() => {
 'use strict';
 
-const Core = window.GarageCore;
-if (!Core) return;
+const Core = window.R00TKITCore;
+const D = window.R00TKITChapter2Data;
+if (!Core || !D) return;
 
 const out = (...a) => Core.out(...a);
 const fmt = Core.fmt;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const sleep = Core.sleep;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = list => list[Math.floor(Math.random() * list.length)];
 
-/* ---------- цели главы 2 ---------- */
-
-const TARGETS = [
-  { id:1, name:'Виктор Ланской', role:'торговец людьми', need:'счета', stars:2, reward:900, trust:7, minTrust:0, risk:22,
-    brief:'держит сеть перевозки людей через три страны. деньги спрятаны в подставных фирмах.' },
-  { id:2, name:'Олег Круг', role:'крышует грабежи', need:'переписка', stars:1, reward:600, trust:5, minTrust:0, risk:15,
-    brief:'мелкий посредник. сводит исполнителей с заказчиками и берёт процент.' },
-  { id:3, name:'Марина Соболь', role:'коррупционер', need:'доказательства', stars:3, reward:1200, trust:9, minTrust:55, risk:30,
-    brief:'чиновница. подписывает контракты через родственников и не любит внимания.' },
-  { id:4, name:'Аркадий Лис', role:'подпольный делец', need:'адреса жертв', stars:3, reward:1400, trust:10, minTrust:62, risk:36,
-    brief:'скупает чужие долги и выбивает их людьми без лиц. жертвы исчезают из списков.' },
-  { id:5, name:'Сергей Волк', role:'наркоторговец', need:'счета', stars:4, reward:1700, trust:13, minTrust:72, risk:46,
-    brief:'держит логистику и платит полиции. осторожен, почти не оставляет цифровых следов.' },
-  { id:6, name:'Nadia Rex', role:'торговец данными', need:'переписка', stars:5, reward:2000, trust:16, minTrust:82, risk:58,
-    brief:'продаёт базы на закрытых форумах. знает, кто стоит за «НИМИ», и молчит об этом.' }
-];
-
-const METHOD_NAMES = { phish:'фишинг', social:'соц. инженерия', hack:'технический взлом', bribe:'подкуп' };
-
-/* ---------- сеть: мелкие задания ---------- */
-
-const NET_NAMES = ['Виктор Ланской','Олег Круг','Марина Соболь','Аркадий Лис','Сергей Волк','Алиса Ветрова','Дмитрий Ким','Роман Барс'];
-const NET_NICKS = ['ghost_77','nullbyte','kira.exe','m4x','v0id','rootcat','n3on','saint'];
-const NET_SITES = ['bank-ural.ru','crypto-pay.io','forum.garage','market.dark','login-secure.tk','pastebin.cc','cloud-dump.net'];
-const NET_ORGS = ['банк «Урал»','картель «Ночь»','фонд «Доверие»','портал «Сеть»','логистика «Восток»'];
-
-const NET_POOLS = { name:NET_NAMES, nick:NET_NICKS, site:NET_SITES, org:NET_ORGS };
-
-const NET_TEMPLATES = [
-  { id:'s1', verb:'scan', text:'найти открытый профиль {name}' },
-  { id:'s2', verb:'scan', text:'найти инфу про хакера {nick}' },
-  { id:'s3', verb:'scan', text:'проверить утечку {site}' },
-  { id:'s4', verb:'scan', text:'собрать архив по {name}' },
-  { id:'s5', verb:'scan', text:'найти докс на {name}' },
-  { id:'s6', verb:'scan', text:'найти след {nick} в {site}' },
-  { id:'s7', verb:'scan', text:'снести тг-аккаунт {nick}' },
-  { id:'c1', verb:'check', text:'проверить уязвимость сайта {site}' },
-  { id:'c2', verb:'check', text:'проверить данные {name}' },
-  { id:'c3', verb:'check', text:'сверить базу {org}' },
-  { id:'c4', verb:'check', text:'проверить платежи {org}' },
-  { id:'c5', verb:'check', text:'проверить фишинговый домен {site}' },
-  { id:'c6', verb:'check', text:'проверить слив базы {org}' },
-  { id:'c7', verb:'check', text:'проверить адрес {name}' },
-  { id:'f1', verb:'confirm', text:'подтвердить личность {name}' },
-  { id:'f2', verb:'confirm', text:'подтвердить утечку {site}' },
-  { id:'f3', verb:'confirm', text:'подтвердить адрес {name}' },
-  { id:'f4', verb:'confirm', text:'подтвердить связь {name} и {org}' },
-  { id:'f5', verb:'confirm', text:'дефнуть от доксеров {name}' },
-  { id:'f6', verb:'confirm', text:'перевести деньги {nick} на благотворительность' },
-  { id:'f7', verb:'confirm', text:'подтвердить слив {site}' }
-];
-
-function pickFrom(list){ return list[Math.floor(Math.random() * list.length)]; }
-
-function makeNetTask(verb, c){
-  const pool = NET_TEMPLATES.filter(t => t.verb === verb);
-  const seen = Array.isArray(c.netSeen) ? c.netSeen : [];
-  let available = pool.filter(t => !seen.includes(t.id));
-  if (!available.length) available = pool;
-  const tpl = pickFrom(available);
-  seen.push(tpl.id);
-  while (seen.length > 8) seen.shift();
-  c.netSeen = seen;
-  const title = tpl.text.replace(/\{(\w+)\}/g, (_, key) => pickFrom(NET_POOLS[key] || ['—']));
-  return {
-    verb,
-    tpl: tpl.id,
-    title,
-    trust: 1 + Math.floor(Math.random() * 3),
-    money: 5 + Math.floor(Math.random() * 26),
-    duration: 3 + Math.floor(Math.random() * 4)
-  };
-}
-
-let netLineEl = null;
+let pendingEscape = false;
+let mailLock = null;
+let mailTimer = null;
+let mailKeyBound = false;
+let pauseUntil = 0;
 
 /* ---------- состояние ---------- */
 
-let pendingEscape = false;
-let socialPick = false;
+function createState(){
+  return {
+    v: 2,
+    introSeen: false,
+    tutorial: { step: 0, done: false },
+    n3x: 0,
+    sp: 0,
+    virusInfected: 0,
+    virusPoints: 0,
+    virusRate: 0,
+    networks: {},
+    skills: { speed:0, depth:0, accuracy:0, autodig:0 },
+    case: null,
+    sideCase: null,
+    storyIndex: 0,
+    completed: [],
+    mail: { nextId: 1, items: [] },
+    darknet: { offers: [], hot: null, rumors: [], nextRoll: 0 },
+    burnAt: 0,
+    lastDigAt: 0,
+    burnAlert: false,
+    pendingMail: null,
+    storyDone: false,
+    legacy: null
+  };
+}
 
-function state(){ return Core.state; }
+function ensureState(s){
+  if (!s) return null;
+  if (!s.ch2State) s.ch2State = true;
+  s.v = 2;
+  if (!s.tutorial || typeof s.tutorial !== 'object') s.tutorial = { step:0, done:false };
+  s.tutorial.step = clamp(Math.floor(Number(s.tutorial.step) || 0), 0, 6);
+  s.tutorial.done = !!s.tutorial.done;
+  s.n3x = Math.max(0, Number(s.n3x) || 0);
+  s.sp = Math.max(0, Math.floor(Number(s.sp) || 0));
+  s.virusInfected = Math.max(0, Math.floor(Number(s.virusInfected) || 0));
+  s.virusPoints = Math.max(0, Number(s.virusPoints) || 0);
+  s.virusRate = Math.max(0, Number(s.virusRate) || 0);
+  if (!s.networks || typeof s.networks !== 'object') s.networks = {};
+  if (!s.skills || typeof s.skills !== 'object') s.skills = {};
+  for (const id of Object.keys(D.SKILLS)) if (!isFinite(Number(s.skills[id]))) s.skills[id] = 0;
+  if (!Array.isArray(s.completed)) s.completed = [];
+  if (!s.mail || typeof s.mail !== 'object') s.mail = { nextId:1, items:[] };
+  if (!Array.isArray(s.mail.items)) s.mail.items = [];
+  if (!s.darknet || typeof s.darknet !== 'object') s.darknet = { offers:[], hot:null, rumors:[], nextRoll:0 };
+  if (!Array.isArray(s.darknet.offers)) s.darknet.offers = [];
+  if (!Array.isArray(s.darknet.rumors)) s.darknet.rumors = [];
+  if (typeof s.burnAlert !== 'boolean') s.burnAlert = false;
+  if (typeof s.storyDone !== 'boolean') s.storyDone = false;
+  if (!s.case || typeof s.case !== 'object') s.case = null;
+  if (!s.sideCase || typeof s.sideCase !== 'object') s.sideCase = null;
+  if (!s.pendingMail) s.pendingMail = null;
+  return s;
+}
 
-function ensure(){
-  const s = state();
-  if (!s || !s.chapter2) return null;
-  if (!s.ch2 || typeof s.ch2 !== 'object') s.ch2 = {};
-  const c = s.ch2;
-  if (!isFinite(Number(c.trust))) c.trust = 50;
-  if (!isFinite(Number(c.done))) c.done = 0;
-  if (!isFinite(Number(c.sp))) c.sp = 0;
-  if (!c.skills || typeof c.skills !== 'object') c.skills = {};
-  for (const k of Object.keys(METHOD_NAMES)) if (!isFinite(Number(c.skills[k]))) c.skills[k] = 0;
-  if (!Array.isArray(c.completed)) c.completed = [];
-  if (!c.closed || typeof c.closed !== 'object') c.closed = {};
-  if (!c.extra || typeof c.extra !== 'object') c.extra = {};
-  if (!Array.isArray(c.netSeen)) c.netSeen = [];
-  if (!c.netTasks || typeof c.netTasks !== 'object') c.netTasks = {};
-  for (const v of ['scan', 'check', 'confirm']){
-    if (!c.netTasks[v] || typeof c.netTasks[v] !== 'object' || !c.netTasks[v].title) c.netTasks[v] = makeNetTask(v, c);
+function ensure(){ return ensureState(Core.state); }
+
+function stashLegacy(s){
+  if (!s || s.legacy) return s;
+  s.legacy = {
+    chapter1Earned: Math.max(0, Number(s.earned) || 0),
+    chapter1Hacks: Math.max(0, Number(s.hacks) || 0),
+    archivedAt: Date.now()
+  };
+  return s;
+}
+
+function makeCase(id){
+  const def = id === 'tutorial' ? D.TUTORIAL_CASE : D.CASES.find(c => c.id === id);
+  if (!def) return null;
+  return {
+    id: def.id,
+    name: def.name,
+    title: def.title,
+    need: def.need,
+    digs: def.digs,
+    progress: 0,
+    story: id !== 'tutorial',
+    lore: def.lore || ''
+  };
+}
+
+function currentCase(c){ return c && c.case ? c.case : null; }
+function currentSide(c){ return c && c.sideCase ? c.sideCase : null; }
+
+function ensureStoryCase(c){
+  if (!c || c.case || !c.tutorial.done || c.storyDone) return;
+  if (c.storyIndex >= D.CASES.length) return;
+  if (c.pendingMail || unreadRequired(c)) return;
+  c.case = makeCase(D.CASES[c.storyIndex].id);
+}
+
+function digCooldown(c){
+  const speed = Math.min(10, Math.max(0, Number(c.skills.speed) || 0));
+  return Math.max(1.25, 2.5 * (1 - speed * 0.05));
+}
+
+function digGain(c, target){
+  if (!target) return 0;
+  const depth = Math.min(10, Math.max(0, Number(c.skills.depth) || 0));
+  return (target.need / target.digs) * (1 + depth * 0.10);
+}
+
+function findChance(c){
+  const acc = Math.min(10, Math.max(0, Number(c.skills.accuracy) || 0));
+  return Math.min(0.55, 0.05 + acc * 0.05);
+}
+
+function autodigFraction(c){
+  const lvl = Math.min(10, Math.max(0, Number(c.skills.autodig) || 0));
+  return Math.min(0.15, 0.05 + lvl * 0.01);
+}
+
+function activeTarget(c, side){
+  return side ? c.sideCase : c.case;
+}
+
+/* ---------- письма ---------- */
+
+function unreadRequired(c){
+  return (c.mail.items || []).some(m => m.required && !m.read);
+}
+
+function blockByMail(c){
+  if (c.pendingMail || unreadRequired(c)){
+    out('сначала прочитай письмо: mail', 'err');
+    return true;
   }
-  if (!c.netJob || typeof c.netJob !== 'object') c.netJob = null;
-  if (typeof c.introSeen !== 'boolean') c.introSeen = false;
-  if (!c.op || typeof c.op !== 'object') c.op = null;
-  if (typeof c.ended !== 'boolean') c.ended = false;
-  if (typeof c.finalOffered !== 'boolean') c.finalOffered = false;
-  return c;
+  return false;
 }
 
-function targetById(id){
-  return TARGETS.find(t => t.id === Number(id)) || null;
+function addMail(c, id){
+  if (!D.MAILS[id]) return;
+  if (c.mail.items.some(m => m.id === id)) return;
+  const d = D.MAILS[id];
+  c.mail.items.push({
+    id,
+    from: 'cyberleek',
+    subject: d.subject,
+    body: d.body,
+    read: false,
+    required: true,
+    at: Date.now()
+  });
+  c.pendingMail = id;
+  Core.note(`НОВОЕ ПИСЬМО\ncyberleek · ${d.subject}`, 'gold', 7000);
+  Core.updateBadges();
 }
 
-function bar(p){
-  p = clamp(Number(p) || 0, 0, 1);
-  const n = Math.round(p * 20);
-  return '█'.repeat(n) + '░'.repeat(20 - n);
+function mailList(c){
+  out('ПОЧТА · cyberleek', 'head');
+  out('');
+  if (!c.mail.items.length){
+    out('  пусто.', 'dim');
+  } else {
+    for (const m of c.mail.items){
+      out(`  [${m.id}] ${m.subject}${m.read ? '' : ' · новое'}`, m.read ? 'dim' : '');
+    }
+  }
+  out('');
+  out('  mail read <id> — открыть письмо · письма не удаляются', 'dim');
+  out('');
 }
 
-function stars(n){
-  return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
+function bindMailKey(){
+  if (mailKeyBound) return;
+  mailKeyBound = true;
+  document.addEventListener('keydown', onMailKey, true);
+  document.addEventListener('pointerdown', onMailPointer, true);
 }
 
-/* ---------- письма главы 1 ---------- */
+function unbindMailKey(){
+  if (!mailKeyBound) return;
+  mailKeyBound = false;
+  document.removeEventListener('keydown', onMailKey, true);
+  document.removeEventListener('pointerdown', onMailPointer, true);
+}
 
-function tickChapter1(){
-  const s = state();
-  if (!s || !s.started || s.chapter2 || !s.story || s.finished) return;
-  if (!s.ch2Mail || typeof s.ch2Mail !== 'object') s.ch2Mail = { m1:false, m2:false, m3:false };
-  const m = s.ch2Mail;
-  if (!m.m1 && s.earned >= 1500000){
-    m.m1 = true;
-    Core.addMail(Core.storyMail('скоро', 'заработай ещё немного, скоро увидимся'));
+function onMailKey(e){
+  if (!mailLock || mailLock.phase !== 'close') return;
+  e.preventDefault();
+  closeMail();
+}
+
+function onMailPointer(e){
+  if (!mailLock || mailLock.phase !== 'close') return;
+  e.preventDefault();
+  closeMail();
+}
+
+function showMail(c, id){
+  const m = c.mail.items.find(x => x.id === id);
+  if (!m){ out('нет такого письма. mail — список.', 'err'); return; }
+  if (mailLock) return;
+  if (Core.state !== c) return;
+  Core.clearConsole();
+  out(`ПИСЬМО · ${m.from}`, 'head');
+  out('');
+  out('  ' + m.subject, '');
+  out('');
+  for (const line of String(m.body || '').split('\n')) out('  ' + line, '');
+  out('');
+  out('  ввод заблокирован на 3 секунды...', 'dim');
+  Core.setTask('письмо: прочитай');
+  Core.disableInput();
+  mailLock = { id, phase: 'wait' };
+  const token = c;
+  if (mailTimer){ clearTimeout(mailTimer); mailTimer = null; }
+  mailTimer = setTimeout(() => {
+    mailTimer = null;
+    if (!mailLock || Core.state !== token) return;
+    mailLock.phase = 'close';
+    out('  нажми любую клавишу или кликни, чтобы закрыть.', 'dim');
+    out('');
+    bindMailKey();
+  }, 3000);
+}
+
+function closeMail(){
+  if (!mailLock) return;
+  const c = ensure();
+  const id = mailLock.id;
+  mailLock = null;
+  if (mailTimer){ clearTimeout(mailTimer); mailTimer = null; }
+  unbindMailKey();
+  const m = c && c.mail.items.find(x => x.id === id);
+  if (m) m.read = true;
+  if (c && c.pendingMail === id) c.pendingMail = null;
+  if (c) ensureStoryCase(c);
+  Core.enableInput();
+  Core.focusInput();
+  if (c) setTaskFor(c);
+  Core.save();
+  Core.updateBadges();
+}
+
+function maybeShowPendingMail(c){
+  if (!c || !c.pendingMail || mailLock || Core.cutsceneActive()) return;
+  const id = c.pendingMail;
+  setTimeout(() => {
+    const cur = ensure();
+    if (!cur || cur.pendingMail !== id || mailLock || Core.cutsceneActive()) return;
+    showMail(cur, id);
+  }, 900);
+}
+
+/* ---------- HUD / задачи ---------- */
+
+function setTaskFor(c){
+  if (!c) return;
+  if (!c.tutorial.done){
+    if (c.tutorial.step === 1) return Core.setTask('darknet → возьми тестовый заказ');
+    if (c.tutorial.step === 2) return Core.setTask('dig → накопи 50 info → expose');
+    if (c.tutorial.step === 3) return Core.setTask('virus list → virus buy 1');
+    if (c.tutorial.step === 4) return Core.setTask('жди VIRUS-поинты → 1 SP');
+    if (c.tutorial.step === 5) return Core.setTask('skills → вложи 1 SP');
+  }
+  if (c.pendingMail || unreadRequired(c)) return Core.setTask('прочитай письмо: mail');
+  if (c.case) return Core.setTask(`info ${c.case.title || c.case.name} · ${Math.floor(c.case.progress)}/${c.case.need}`);
+  if (c.storyDone) return Core.setTask('история главы 2 завершена');
+  return Core.setTask('case → текущее дело · darknet → заказы');
+}
+
+function showStatus(){
+  const c = ensure();
+  if (!c) return;
+  const target = c.case;
+  out('ТИХАЯ КОМНАТА', 'head');
+  out(`  N3X ${c.n3x.toFixed(1)} · Points ${c.sp} · VIRUS ${c.virusInfected} · +${c.virusRate.toFixed(2)} points/s`, '');
+  out('');
+  if (target){
+    out(`  дело: ${target.title || target.name} · ${Math.floor(target.progress)}/${target.need}`, '');
+  } else if (c.tutorial.done && !c.storyDone){
+    out('  дело: нет · case — начать текущее', 'dim');
+  } else if (c.storyDone){
+    out('  история главы 2 завершена.', 'dim');
+  } else {
+    out('  обучение: начни с darknet', 'dim');
+  }
+  out('');
+}
+
+/* ---------- катсцена и старт ---------- */
+
+async function introCutscene(){
+  const c = ensure();
+  if (!c) return;
+  Core.clearConsole();
+  Core.setTask('');
+  Core.music('gameplay');
+  const token = Core.beginCutscene();
+  await Core.sleep(600);
+  if (!Core.cutAlive(token)) return;
+  for (const [who, text] of D.CUTSCENE){
+    if (!Core.cutAlive(token)) return;
+    await Core.cutLine(who, text, token, '', who === 'hacker' ? 'cyberleek' : 'you');
+  }
+  if (!Core.cutAlive(token)) return;
+  Core.finishCutscene(token);
+  c.introSeen = true;
+  c.tutorial.step = Math.max(1, c.tutorial.step);
+  Core.clearConsole();
+  out('ГЛАВА 2 · ТИХАЯ КОМНАТА', 'head');
+  out('');
+  out('  cyberleek: «Для начала зайди в darknet. Возьми простой заказ.',
+      '');
+  out('  Пойми, как работает dig. Потом сдай инфу через expose.»', 'dim');
+  out('');
+  Core.setTask('darknet → возьми тестовый заказ');
+  Core.focusInput();
+  Core.renderHUD();
+  Core.save();
+  maybeShowPendingMail(c);
+}
+
+function menu(){
+  Core.clearConsole();
+  out('R00TKIT // ГЛАВА 2', 'head');
+  out('');
+  out('  ТИХАЯ КОМНАТА', '');
+  out('  введите "start" чтобы продолжить', '');
+  out('  help — команды', 'dim');
+  out('');
+}
+
+function start(){
+  const c = ensure();
+  if (!c) return;
+  if (!c.introSeen){ introCutscene().catch(() => {}); return; }
+  ensureStoryCase(c);
+  showStatus();
+  setTaskFor(c);
+  Core.hideHints();
+  Core.focusInput();
+  Core.renderHUD();
+  Core.save();
+  maybeShowPendingMail(c);
+}
+
+/* ---------- dig / expose ---------- */
+
+function cmdCase(c){
+  if (!c.tutorial.done && c.tutorial.step === 1){
+    out('сначала darknet — возьми тестовый заказ.', 'dim');
+    return;
+  }
+  ensureStoryCase(c);
+  const main = c.case;
+  const side = c.sideCase;
+  out('ДЕЛА', 'head');
+  out('');
+  if (main){
+    out(`  [main] ${main.title || main.name} · ${Math.floor(main.progress)}/${main.need}`, '');
+    out(`  ${main.lore || ''}`, 'dim');
+  } else if (c.storyDone){
+    out('  основная история завершена.', 'dim');
+  } else {
+    out('  основного дела нет. Проверь почту или начни case.', 'dim');
+  }
+  if (side){
+    out('');
+    out(`  [side] ${side.title} · ${Math.floor(side.progress)}/${side.need}`, '');
+    out(`  награда: ${side.reward} N3X`, 'dim');
+  }
+  out('');
+  out('  dig — копать основное · dig side — побочное', 'dim');
+  out('  expose — сдать при 100% · expose side — побочное', 'dim');
+  out('');
+  setTaskFor(c);
+}
+
+function cmdDig(c, side){
+  if (blockByMail(c)) return;
+  if (!side) ensureStoryCase(c);
+  const target = activeTarget(c, side);
+  if (!target){
+    out(side ? 'побочного дела нет. darknet — заказы.' : 'дела нет. darknet — заказы.', 'dim');
+    return;
+  }
+  if (target.progress >= target.need){
+    out('info уже 100%. введи expose.', 'dim');
+    return;
+  }
+  const now = Date.now();
+  const cd = digCooldown(c) * 1000;
+  if (now - (c.lastDigAt || 0) < cd){
+    out(`кулдаун dig: ${Math.ceil((cd - (now - c.lastDigAt)) / 1000)}с`, 'dim');
+    return;
+  }
+  c.lastDigAt = now;
+  out('');
+  if (Math.random() < 0.10){
+    out('> dig провалился. след пустой. прогресс не изменился.', 'warn');
+    out('');
     Core.save();
+    return;
   }
-  if (!m.m2 && s.earned >= 5000000){
-    m.m2 = true;
-    Core.addMail(Core.storyMail('цель близко', 'ты очень близок к цели'));
-    Core.save();
+  const gain = digGain(c, target);
+  target.progress = Math.min(target.need, target.progress + gain);
+  out(`> dig: +${gain.toFixed(1)} info · ${Math.floor(target.progress)}/${target.need}`, '');
+  if (Math.random() < findChance(c)){
+    const found = Math.round(rnd(0.2, 0.8) * 10) / 10;
+    c.n3x += found;
+    out(`> находка: +${found.toFixed(1)} N3X`, 'gold');
+    Core.note(`НАХОДКА · +${found.toFixed(1)} N3X`, 'gold', 6000);
   }
-  if (!m.m3 && s.earned >= 10000000){
-    m.m3 = true;
-    Core.addMail(Core.storyMail(
-      'НУЖНО БЕЖАТЬ',
-      'НУЖНО БЕЖАТЬ! Я вижу что ОНИ уже вычислили тебя, тебе надо бежать, я в файле лежат координаты, качай на флешку, бери ноут и вали. там же лежит билет, скачай на телефон, в аэропорту покажешь qr-код. не спрашивай куда, так нужно',
-      'data.txt'
-    ));
+  if (target.progress >= target.need){
+    out('> info 100%. теперь expose.', 'ok');
+    out('');
+  }
+  setTaskFor(c);
+  Core.save();
+  Core.renderHUD();
+}
+
+function cmdExpose(c, side){
+  if (blockByMail(c)) return;
+  const target = activeTarget(c, side);
+  if (!target){ out(side ? 'побочного дела нет.' : 'дела нет. darknet — заказы.', 'dim'); return; }
+  if (target.progress < target.need){
+    out(`info ${Math.floor(target.progress)}/${target.need}. нужно 100%.`, 'err');
+    return;
+  }
+  if (!side && target.id === 'tutorial'){
+    c.n3x += 5;
+    c.case = null;
+    c.tutorial.step = 3;
+    c.lastDigAt = 0;
+    out('');
+    out(`[EXPOSE] тестовый человек сдан · +5.0 N3X`, 'ok');
+    out('  первые деньги есть. теперь купи сеть вируса.', 'dim');
+    out('');
+    setTaskFor(c);
     Core.save();
+    Core.renderHUD();
+    return;
+  }
+  if (side){
+    c.n3x += target.reward;
+    c.sideCase = null;
+    out('');
+    out(`[EXPOSE] побочный заказ закрыт · +${target.reward} N3X`, 'ok');
+    out('');
+    setTaskFor(c);
+    Core.save();
+    Core.renderHUD();
+    return;
+  }
+  const story = target;
+  c.n3x += story.reward;
+  c.storyIndex = Math.min(D.CASES.length, c.storyIndex + 1);
+  c.completed.push(story.id);
+  c.case = null;
+  c.lastDigAt = 0;
+  out('');
+  out(`[EXPOSE] ${story.title || story.name} сдан · +${story.reward} N3X`, 'ok');
+  out('');
+  if (c.storyIndex < D.CASES.length){
+    const next = makeCase(D.CASES[c.storyIndex].id);
+    c.case = next;
+    addMail(c, 'm' + (c.storyIndex + 1));
+  } else {
+    c.storyDone = true;
+    addMail(c, 'm7');
+  }
+  setTaskFor(c);
+  Core.save();
+  Core.renderHUD();
+  maybeShowPendingMail(c);
+}
+
+/* ---------- virus ---------- */
+
+function networkPrice(net, owned){
+  return Math.round(net.price * Math.pow(1.6, owned));
+}
+
+function virusList(){
+  const c = ensure();
+  if (!c) return;
+  out('VIRUS · сети', 'head');
+  out(`  VIRUS: ${c.virusInfected} ПК · +${c.virusRate.toFixed(2)} points/s`, 'dim');
+  out(`  поинты: ${c.virusPoints.toFixed(1)} / 100`, 'dim');
+  out('');
+  for (const net of D.NETWORKS){
+    const owned = c.networks[net.id] || 0;
+    const price = networkPrice(net, owned);
+    const addRate = net.rate * Math.pow(0.85, owned);
+    out(`  [${net.id}] ${net.label.padEnd(16)} ур.${owned} · $${price} N3X · +${net.pc} ПК · +${addRate.toFixed(2)}/s`, '');
+  }
+  out('');
+  out('  virus buy <id> — купить сеть', 'dim');
+  out('');
+}
+
+function cmdVirus(c, args){
+  if (!args || !args[0] || args[0] === 'list'){ virusList(); c.burnAlert = false; Core.save(); return; }
+  const what = String(args[0]).toLowerCase();
+  if (what !== 'buy'){ virusList(); return; }
+  if (blockByMail(c)) return;
+  const net = D.NETWORKS.find(n => String(n.id) === String(args[1]) || n.name === String(args[1] || '').toLowerCase());
+  if (!net){ out('virus buy <id>. id смотри в virus list.', 'err'); return; }
+  const owned = c.networks[net.id] || 0;
+  const price = networkPrice(net, owned);
+  if (c.n3x < price){ out(`нужно ${price} N3X. не хватает ${(price - c.n3x).toFixed(1)}.`, 'err'); return; }
+  c.n3x -= price;
+  c.networks[net.id] = owned + 1;
+  c.virusInfected += net.pc;
+  c.virusRate += net.rate * Math.pow(0.85, owned);
+  out(`[VIRUS] ${net.label} · +${net.pc} ПК · +${(net.rate * Math.pow(0.85, owned)).toFixed(2)} points/s`, 'ok');
+  out(`  VIRUS: ${c.virusInfected} · +${c.virusRate.toFixed(2)} points/s`, 'dim');
+  if (!c.tutorial.done && c.tutorial.step === 3){
+    c.tutorial.step = 4;
+    out('  [ОБУЧЕНИЕ] вирус поставлен. теперь подожди, пока накопятся VIRUS-поинты.', 'dim');
+  }
+  setTaskFor(c);
+  Core.save();
+  Core.renderHUD();
+}
+
+/* ---------- skills ---------- */
+
+function skillCost(id, level){
+  const def = D.SKILLS[id];
+  return Math.max(1, Math.round(def.base * Math.pow(1.5, level)));
+}
+
+function cmdSkills(c, args){
+  if (!args || !args[0]){
+    out('SKILLS', 'head');
+    out(`  Points: ${c.sp}`, '');
+    out('');
+    for (const id of Object.keys(D.SKILLS)){
+      const def = D.SKILLS[id];
+      const lvl = c.skills[id] || 0;
+      out(`  ${id.padEnd(9)} ур.${lvl} · ${def.desc} · цена ${lvl >= def.cap ? '—' : skillCost(id, lvl) + ' SP'}`, '');
+    }
+    out('');
+    out('  skills buy <speed|depth|accuracy|autodig>', 'dim');
+    out('');
+    return;
+  }
+  const what = String(args[0]).toLowerCase();
+  if (what !== 'buy'){ out('skills buy <id>', 'err'); return; }
+  if (blockByMail(c)) return;
+  const id = String(args[1] || '').toLowerCase();
+  if (!D.SKILLS[id]){ out('skills buy speed|depth|accuracy|autodig', 'err'); return; }
+  const def = D.SKILLS[id];
+  const lvl = c.skills[id] || 0;
+  if (lvl >= def.cap){ out(`${def.name} уже максимальный.`, 'dim'); return; }
+  const cost = skillCost(id, lvl);
+  if (c.sp < cost){ out(`нужно ${cost} SP. сейчас ${c.sp}.`, 'err'); return; }
+  c.sp -= cost;
+  c.skills[id] = lvl + 1;
+  out(`[SKILL] ${def.name} → ур.${c.skills[id]} · -${cost} SP`, 'ok');
+  if (!c.tutorial.done && c.tutorial.step === 5){
+    c.tutorial.done = true;
+    c.tutorial.step = 6;
+    c.storyIndex = 0;
+    c.case = makeCase(D.CASES[0].id);
+    addMail(c, 'm1');
+    out('  [ОБУЧЕНИЕ] готово. дальше — s1mka. письмо в почте.', 'dim');
+  }
+  setTaskFor(c);
+  Core.save();
+  Core.renderHUD();
+  maybeShowPendingMail(c);
+}
+
+/* ---------- darknet ---------- */
+
+function dnMakeOffer(c, id){
+  const tpl = pick(D.DARKNET.offers);
+  const title = tpl.replace(/\{(\w+)\}/g, (_, k) => pick(D.DARKNET[k + 's'] || D.DARKNET.names));
+  const need = 20 + Math.floor(Math.random() * 31);
+  return {
+    id,
+    title,
+    need,
+    digs: Math.max(3, Math.ceil(need / 5)),
+    reward: 1 + Math.floor(Math.random() * 3),
+    expires: Date.now() + (20 + Math.floor(Math.random() * 21)) * 60000
+  };
+}
+
+function dnRoll(c, force){
+  const now = Date.now();
+  if (!force && now < (c.darknet.nextRoll || 0)) return;
+  c.darknet.offers = [dnMakeOffer(c, 'd1'), dnMakeOffer(c, 'd2'), dnMakeOffer(c, 'd3')];
+  c.darknet.rumors = [pick(D.DARKNET.rumors), pick(D.DARKNET.rumors)];
+  c.darknet.hot = null;
+  if (Math.random() < 0.15){
+    const h = pick(D.DARKNET.hot);
+    c.darknet.hot = {
+      id:'hot',
+      title:h.text,
+      need:h.need,
+      digs:Math.max(5, Math.ceil(h.need / 5)),
+      reward:h.reward,
+      expires:Date.now() + h.minutes * 60000
+    };
+  }
+  c.darknet.nextRoll = now + 10 * 60000;
+}
+
+function dnMenu(c){
+  dnRoll(c);
+  out('DARKNET', 'head');
+  out('');
+  if (!c.tutorial.done && c.tutorial.step === 1){
+    out('  [test] тестовый человек · 50 info · 5 N3X', 'gold');
+    out('         darknet take test', 'dim');
+    out('');
+  }
+  for (const o of c.darknet.offers){
+    const left = Math.max(0, Math.ceil((o.expires - Date.now()) / 60000));
+    out(`  [${o.id}] ${o.title} · ${o.need} info · ${o.reward} N3X · ${left}м`, '');
+  }
+  if (c.darknet.hot){
+    const h = c.darknet.hot;
+    const left = Math.max(0, Math.ceil((h.expires - Date.now()) / 60000));
+    out(`  [hot] ${h.title} · ${h.need} info · ${h.reward} N3X · ${left}м`, 'gold');
+  }
+  out('');
+  for (const r of c.darknet.rumors) out(`  слух: ${r}`, 'dim');
+  out('');
+  out('  darknet take <id> — взять побочный заказ', 'dim');
+  out('');
+}
+
+function cmdDarknet(c, args){
+  if (!args || !args[0]){ dnMenu(c); return; }
+  if (String(args[0]).toLowerCase() !== 'take'){ dnMenu(c); return; }
+  if (blockByMail(c)) return;
+  const id = String(args[1] || '').toLowerCase();
+  if (!c.tutorial.done && c.tutorial.step === 1 && id === 'test'){
+    c.case = makeCase('tutorial');
+    c.tutorial.step = 2;
+    out('[DARKNET] заказ взят: тестовый человек · 50 info', 'ok');
+    out('  теперь dig, пока info не станет 50.', 'dim');
+    setTaskFor(c);
+    Core.save();
+    return;
+  }
+  if (c.sideCase){ out('побочное дело уже идёт. сначала expose или dig side.', 'dim'); return; }
+  let offer = c.darknet.offers.find(o => o.id === id);
+  if (id === 'hot' && c.darknet.hot) offer = c.darknet.hot;
+  if (!offer){ out('нет такого заказа. darknet — список.', 'err'); return; }
+  if (offer.expires < Date.now()){
+    out('заказ уже исчез.', 'dim');
+    dnRoll(c, true);
+    return;
+  }
+  c.sideCase = {
+    id: offer.id,
+    title: offer.title,
+    need: offer.need,
+    digs: offer.digs,
+    reward: offer.reward,
+    progress: 0,
+    expires: offer.expires,
+    story: false
+  };
+  if (id === 'hot') c.darknet.hot = null;
+  else c.darknet.offers = c.darknet.offers.filter(o => o.id !== id);
+  out(`[DARKNET] взято: ${offer.title} · ${offer.need} info · ${offer.reward} N3X`, 'ok');
+  out('  dig side — копать · expose side — сдать.', 'dim');
+  setTaskFor(c);
+  Core.save();
+}
+
+/* ---------- help / reset ---------- */
+
+function help(){
+  out('ГЛАВА 2 · КОМАНДЫ', 'head');
+  out('');
+  out('ДЕЛО', 'head');
+  out('  case                 текущее дело', '');
+  out('  dig                  копать основное дело', '');
+  out('  dig side             копать побочное', '');
+  out('  expose               сдать при 100%', '');
+  out('  expose side          сдать побочное', '');
+  out('');
+  out('ЗАКАЗЫ', 'head');
+  out('  darknet              список заказов и слухов', '');
+  out('  darknet take <id>    взять побочный заказ', '');
+  out('');
+  out('VIRUS', 'head');
+  out('  virus                меню сетей', '');
+  out('  virus list           список сетей', '');
+  out('  virus buy <id>       купить сеть за N3X', '');
+  out('');
+  out('РАЗВИТИЕ', 'head');
+  out('  skills               навыки', '');
+  out('  skills buy <id>      потратить SP', '');
+  out('');
+  out('ПОЧТА', 'head');
+  out('  mail                 список писем', '');
+  out('  mail read <id>       открыть письмо', '');
+  out('');
+  out('СИСТЕМА', 'head');
+  out('  help                 эта справка', '');
+  out('  status               состояние', '');
+  out('  reset confirm        начать главу 2 заново', '');
+  out('');
+}
+
+function cmdReset(c, arg){
+  if (String(arg || '').toLowerCase() !== 'confirm'){
+    out('это сотрёт главу 2 и вернёт её в начало. введи: reset confirm', 'err');
+    return;
+  }
+  Core.restartChapter2();
+}
+
+/* ---------- диспетчер ---------- */
+
+function handle(cmd, args, line){
+  const s = Core.state;
+  if (!s) return false;
+
+  if (Core.chapter !== 2){
+    if (s.finished === 'prison' && cmd === 'start'){ prisonEnding(); return true; }
+    if (pendingEscape){
+      if (cmd === '1' || cmd === 'сбежать'){ pendingEscape = false; escapeToChapter2().catch(() => {}); return true; }
+      if (cmd === '2' || cmd === 'остаться'){ pendingEscape = false; prisonEnding(); return true; }
+    }
+    if (cmd === 'open' && String(args[0] || '').toLowerCase() === 'data.txt'){ openData(); return true; }
+    return false;
+  }
+
+  const c = ensure();
+  if (!c) return false;
+
+  if (pendingEscape){
+    if (cmd === '1'){ pendingEscape = false; return true; }
+    if (cmd === '2'){ pendingEscape = false; return true; }
+  }
+
+  switch(cmd){
+    case 'case': cmdCase(c); return true;
+    case 'dig': cmdDig(c, String(args[0] || '').toLowerCase() === 'side'); return true;
+    case 'expose': cmdExpose(c, String(args[0] || '').toLowerCase() === 'side'); return true;
+    case 'darknet': cmdDarknet(c, args); return true;
+    case 'virus': cmdVirus(c, args); return true;
+    case 'skills': cmdSkills(c, args); return true;
+    case 'mail':
+      if (String(args[0] || '').toLowerCase() === 'read'){
+        const id = String(args[1] || '').toLowerCase();
+        if (!id){ mailList(c); return true; }
+        showMail(c, id);
+      } else {
+        mailList(c);
+      }
+      return true;
+    case 'help': help(); return true;
+    case 'hints': help(); return true;
+    case 'reset': cmdReset(c, args[0]); return true;
+    case 'status': showStatus(); return true;
+    case 'whoami': out('operator · глава 2 · тихая комната', ''); return true;
+    case 'hack': case 'shop': case 'buy': case 'farm': case 'rig': case 'team': case 'move': case 'cool': case 'targets': case 'menu': case 'learn':
+      out('в главе 2 этой механики нет. help — команды.', 'dim');
+      return true;
+    default:
+      return false;
   }
 }
 
-/* ---------- data.txt и выбор побега ---------- */
+/* ---------- глава 1 → глава 2 ---------- */
 
 function openData(){
-  const s = state();
+  const s = Core.state;
   if (!s.mails || !s.mails.some(m => m.attachment === 'data.txt')){
     out('файла data.txt нет. проверь почту: mail', 'err');
     return;
@@ -171,9 +799,9 @@ function openData(){
   Core.clearConsole();
   out('data.txt', 'head');
   out('');
-  out('  координаты: 67.565094, 30.478012', '');
+  out('  координаты: 21.919520, -71.94013', '');
   out('  билет: 3P-0917 · место 13A', '');
-  out('  аэропорт: Мурманск · вылет через 6 часов', 'dim');
+  out('  аэропорт: вылет через 6 часов', 'dim');
   out('');
   out('  QR:', 'dim');
   out('  █▀▀▀█ ▄▀▄ █▀▀▀█', 'dim');
@@ -188,17 +816,10 @@ function openData(){
   Core.focusInput();
 }
 
-function escapeEnding(){
-  out('');
-  out('ты закрываешь ноутбук.', 'dim');
-  out('флешка в кармане. билет в телефоне. дверь скрипит.', 'dim');
-  out('');
-  enterChapter2().catch(() => {});
-}
-
 function prisonEnding(){
-  const s = state();
+  const s = Core.state;
   s.finished = 'prison';
+  s.pendingEscape = false;
   Core.save();
   Core.clearConsole();
   Core.setTask('');
@@ -208,769 +829,105 @@ function prisonEnding(){
   out('тебе приписали 18 статей.', 'err');
   out('срок — 99 лет, без права на досрочное.', 'err');
   out('');
-  out('проверка связи завершена. терминал замолчал.', 'dim');
-  out('');
   out('reset confirm — начать заново.', 'dim');
   out('');
 }
 
-/* ---------- вход в главу 2 ---------- */
-
-async function enterChapter2(){
-  pendingEscape = false;
-  socialPick = false;
-  netLineEl = null;
-  const old = state();
+async function escapeToChapter2(){
+  const old = Core.state;
   const nick = old.nick || Core.readNick();
-  const next = Core.newState();
+  const next = createState();
   next.started = true;
   next.nick = nick;
-  next.money = 1000;
-  next.tutorialDone = true;
-  next.tutorialStep = 8;
-  next.chapter2 = true;
-  next.ch2 = {
-    trust: 50, done: 0, sp: 0,
-    skills: { phish:0, social:0, hack:0, bribe:0 },
-    completed: [], closed: {}, op: null,
-    introSeen: false, ended: false, finalOffered: false
+  next.legacy = {
+    chapter1Earned: Math.max(0, Number(old.earned) || 0),
+    chapter1Hacks: Math.max(0, Number(old.hacks) || 0),
+    archivedAt: Date.now()
   };
-  Core.setState(next);
-  Core.clearConsole();
-  Core.updatePrompt();
-  Core.hideHints();
-  Core.renderHUD();
-  Core.save();
+  Core.switchChapter(2, { nextState: next, wipeCh1: true, autoStart: false });
+  Core.bootChapter();
   await introCutscene();
 }
 
-async function introCutscene(){
-  const s = state();
+/* ---------- тик ---------- */
+
+function tick(dt){
   const c = ensure();
-  if (!s || !c) return;
-  Core.clearConsole();
-  Core.setTask('');
-  Core.music('gameplay');
-  const token = Core.beginCutscene();
-  await sleep(700);
-  if (!Core.cutAlive(token)) return;
+  if (!c) return;
+  if (Core.cutsceneActive() || mailLock || Core.state !== c) return;
+  if (c.pendingMail || unreadRequired(c)) return;
+  const now = Date.now();
+  dt = clamp(Number(dt) || 0.1, 0, 1);
 
-  const lines = [
-    ['hacker', 'Дыши. Ты в безопасности. Пока.'],
-    ['player', 'Кто ты? И где я?'],
-    ['hacker', 'Меня зовут cyber_leek. Раньше я работал на картель. Взламывал всё, что плохо лежит. Заработал миллионы.'],
-    ['hacker', 'Однажды мой взлом открыл не ту дверь. Погиб человек. Не мой заказ, но моя работа.'],
-    ['hacker', 'С тех пор я не беру грязных денег. Сливаю тех, кто торгует людьми, крышует грабежи, прячет коррупцию.'],
-    ['player', 'Почему я?'],
-    ['hacker', 'У меня нет лица в базах. У тебя тоже. Но у тебя есть скорость и молодость. Я сгорел как личность — ты чистый лист.'],
-    ['hacker', 'Я не идеалист. Иногда придётся выбирать меньшее зло. Иногда — врать себе, что иначе было нельзя.'],
-    ['hacker', 'Меня ищут ОНИ. Те же, кто гнал тебя. Я в бегах дольше и тише. Поэтому мне нужен ты.'],
-    ['player', 'Что мне делать?'],
-    ['hacker', 'Слушай задания. Ищи людей. Собирай доказательства. Отдавай их тем, кто сможет остановить цель.'],
-    ['hacker', 'Доверие важнее денег. Чем чище работаешь — тем серьёзнее цели. Гранты небольшие. На жизнь хватит.'],
-    ['hacker', 'Начнём с простого. targets — список. op <id> — операция. И не называй меня unknown. Теперь у меня есть имя.']
-  ];
-
-  for (const [who, text] of lines){
-    if (!Core.cutAlive(token)) return;
-    await Core.cutLine(who, text, token, who === 'hacker' ? 'cut-hacker' : '', who === 'hacker' ? 'cyber_leek' : 'you');
+  // VIRUS passive; during tutorial — x5
+  if (c.virusRate > 0){
+    const mult = c.tutorial.done ? 1 : 5;
+    c.virusPoints += c.virusRate * mult * dt;
+    while (c.virusPoints >= 100){
+      c.virusPoints -= 100;
+      c.sp++;
+      Core.note('SP +1 · 100 VIRUS сконвертированы', 'ok', 6000);
+      if (!c.tutorial.done && c.tutorial.step === 4){
+        c.tutorial.step = 5;
+        Core.note('обучение: открой skills и вложи SP', 'gold', 7000);
+        setTaskFor(c);
+      }
+      Core.updateBadges();
+    }
   }
-  if (!Core.cutAlive(token)) return;
 
-  Core.finishCutscene(token);
-  c.introSeen = true;
-  Core.clearConsole();
-  out('ГЛАВА 2', 'head');
-  out('ТИХАЯ КОМНАТА · $1000 на счету', '');
-  out('');
-  out('  мы работаем на cyber_leek. денег мало, цели серьёзные.', 'dim');
-  out('  targets — список людей · dossier <id> — досье', 'dim');
-  out('  op <id> — начать операцию · jobs — текущая операция', 'dim');
-  out('  help — все команды', 'dim');
-  out('');
-  Core.setTask('выбери цель: targets');
-  Core.focusInput();
-  Core.renderHUD();
-  Core.save();
-}
-
-/* ---------- меню и старт главы 2 ---------- */
-
-function menu(){
-  Core.clearConsole();
-  out('R00TKIT // ГЛАВА 2', 'head');
-  out('');
-  out('  ТИХАЯ КОМНАТА · $1000', '');
-  out('');
-  out('  введите "start" чтобы продолжить', '');
-  out('  help — список команд', 'dim');
-  out('');
-}
-
-function start(){
-  const s = state();
-  const c = ensure();
-  if (!s || !c) return;
-  if (!c.introSeen){ introCutscene().catch(() => {}); return; }
-  Core.clearConsole();
-  out('ТИХАЯ КОМНАТА', 'head');
-  out(`  $${fmt(s.money)} · доверие ${Math.round(c.trust)} · операций ${c.done}`, '');
-  out('');
-  out('  targets — цели · op <id> — операция · jobs — текущая', 'dim');
-  out('  net — задания сети для Trust · help — все команды', 'dim');
-  out('');
-  if (c.ended) out('  история главы 2 завершена.', 'dim');
-  Core.setTask(c.op ? `операция: ${targetById(c.op.id)?.name || 'цель'} · ${stepName(c.op)}` : 'выбери цель: targets');
-  Core.hideHints();
-  Core.focusInput();
-  Core.renderHUD();
-  Core.save();
-}
-
-function stepName(op){
-  if (!op) return '';
-  if (op.step === 'access') return 'доступ';
-  if (op.step === 'search') return 'поиск данных';
-  if (op.step === 'leak') return 'слив';
-  return op.step;
-}
-
-/* ---------- команды ---------- */
-
-function help(){
-  out('ГЛАВА 2 · КОМАНДЫ', 'head');
-  out('');
-  out('ЦЕЛИ', 'head');
-  out('  targets              список людей', '');
-  out('  dossier <id>         досье цели', '');
-  out('');
-  out('ОПЕРАЦИЯ', 'head');
-  out('  op <id>              начать операцию', '');
-  out('  jobs                 текущая операция', '');
-  out('  phish | social | hack | bribe   доступ', '');
-  out('  copy accounts|messages|evidence|all   поиск', '');
-  out('  cover                замести следы ($250)', '');
-  out('');
-  out('СЛИВ', 'head');
-  out('  leak press|police|leek   отдать данные', '');
-  out('  sell                 продать на сторону (-Trust)', '');
-  out('');
-  out('РАЗВИТИЕ И СВЯЗЬ', 'head');
-  out('  trust                текущее доверие', '');
-  out('  net                  задания сети (+1–3 trust)', '');
-  out('  net scan|check|confirm   взять задание', '');
-  out('  skills               навыки', '');
-  out('  learn <метод>        потратить очко навыка', '');
-  out('  leek                 связаться с cyber_leek', '');
-  out('  status               состояние', '');
-  out('  mail                 почта', '');
-  out('');
-  out('ФИНАЛ', 'head');
-  out('  stay | leave         решение после шести операций', '');
-  out('');
-}
-
-function cmdTargets(c){
-  out('ЦЕЛИ · люди', 'head');
-  out(`  доверие ${Math.round(c.trust)} · операций ${c.done}`, 'dim');
-  out('');
-  for (const t of TARGETS){
-    const done = c.completed.includes(t.id);
-    const closed = (c.closed[t.id] || 0) > Date.now();
-    const locked = c.trust < t.minTrust;
-    let status = '';
-    if (done) status = 'закрыто';
-    else if (closed) status = 'в тени · ' + Core.fmtTime(Math.ceil((c.closed[t.id] - Date.now()) / 1000));
-    else if (locked) status = 'нужно доверие ' + t.minTrust + ' · net';
-    out(`  [${t.id}] ${t.name} · ${t.role} · ${stars(t.stars)} · $${fmt(t.reward)} · +${t.trust} trust`, done ? 'dim' : '');
-    out(`       ищем: ${t.need}${status ? ' · ' + status : ''}`, 'dim');
+  // autodig
+  if (c.case && c.case.progress < c.case.need){
+    const gain = digGain(c, c.case);
+    const rate = (gain / digCooldown(c)) * autodigFraction(c);
+    c.case.progress = Math.min(c.case.need, c.case.progress + rate * dt);
   }
-  out('');
-  out('  dossier <id> — подробнее · op <id> — начать', 'dim');
-  out('');
-}
 
-function cmdDossier(t){
-  out(`ДОСЬЕ · ${t.name}`, 'head');
-  out(`  кто:        ${t.role}`, '');
-  out(`  ищем:       ${t.need}`, '');
-  out(`  сложность:  ${stars(t.stars)}`, '');
-  out(`  риск:       ${t.risk}%`, '');
-  out(`  награда:    $${fmt(t.reward)} · +${t.trust} trust`, '');
-  out(`  порог:      доверие ${t.minTrust}`, 'dim');
-  out('');
-  out('  ' + t.brief, 'dim');
-  out('');
-}
-
-function cmdOp(c, id){
-  if (c.ended){ out('история завершена. новых операций нет.', 'dim'); return; }
-  if (c.op){ out(`уже идёт операция: ${targetById(c.op.id)?.name || 'цель'} · jobs`, 'dim'); return; }
-  const t = targetById(id);
-  if (!t){ out('op <id>. targets — список целей.', 'err'); return; }
-  if (c.completed.includes(t.id)){ out(`${t.name}: цель уже закрыта.`, 'dim'); return; }
-  const until = c.closed[t.id] || 0;
-  if (until > Date.now()){ out(`${t.name} в тени ещё ${Core.fmtTime(Math.ceil((until - Date.now()) / 1000))}.`, 'dim'); return; }
-  if (c.trust < t.minTrust){ out(`нужно доверие ${t.minTrust}. сейчас ${Math.round(c.trust)}. используй net — задания сети.`, 'err'); return; }
-  c.op = { id:t.id, step:'access', progress:15, risk:t.risk, fails:0, hardened:false };
-  out('');
-  out(`ОПЕРАЦИЯ · ${t.name}`, 'head');
-  out(`  ${t.role} · ${stars(t.stars)} · риск ${t.risk}%`, '');
-  out(`  ищем: ${t.need}`, 'dim');
-  out('');
-  out('  шаг 1: как войти?', '');
-  out('  phish — фишинг · social — соц. инженерия', 'dim');
-  out('  hack — технический взлом · bribe — подкуп', 'dim');
-  out('');
-  Core.setTask(`операция: ${t.name} · доступ (phish/social/hack/bribe)`);
-  Core.save();
-  Core.updateBadges();
-}
-
-function cmdJobs(c){
-  if (!c.op){ out('активных операций нет. op <id>', 'dim'); return; }
-  const t = targetById(c.op.id);
-  const op = c.op;
-  out('ТЕКУЩАЯ ОПЕРАЦИЯ', 'head');
-  out(`  цель: ${t ? t.name : '—'}`, '');
-  out(`  шаг:  ${stepName(op)} · ${op.progress}% · риск ${op.risk}%`, '');
-  out(`  ${bar(op.progress / 100)}`, 'dim');
-  if (op.step === 'access') out('  дальше: phish | social | hack | bribe', 'dim');
-  else if (op.step === 'search') out('  дальше: copy accounts|messages|evidence|all', 'dim');
-  else if (op.step === 'leak') out('  дальше: leak press|police|leek · sell', 'dim');
-  if (op.hardened) out('  цель насторожилась. другой метод может сработать лучше.', 'dim');
-  out('');
-}
-
-function cmdTrust(c){
-  out('ДОВЕРИЕ', 'head');
-  out(`  сейчас: ${Math.round(c.trust)} / 100`, '');
-  out('');
-  out('  влияет на доступные цели, размер грантов и письма.', 'dim');
-  out('  растёт за чистые операции · падает за грязные методы.', 'dim');
-  out('');
-}
-
-function cmdSkills(c){
-  out('НАВЫКИ ГЛАВЫ 2', 'head');
-  out(`  свободных очков: ${c.sp}`, '');
-  out('');
-  for (const id of Object.keys(METHOD_NAMES)){
-    const lvl = c.skills[id];
-    let bonus = '';
-    if (id === 'phish') bonus = `+${lvl * 5}% успех`;
-    else if (id === 'social') bonus = `+${lvl * 5}% успех`;
-    else if (id === 'hack') bonus = `-$${lvl * 15} цена · +${lvl * 3}% успех`;
-    else if (id === 'bribe') bonus = `-$${lvl * 20} цена`;
-    out(`  ${id.padEnd(7)} ур.${lvl}  ${bonus}`, '');
+  // сгорание сети
+  if (!c.burnAt) c.burnAt = now + (6 + Math.floor(Math.random() * 5)) * 60000;
+  if (now >= c.burnAt){
+    c.burnAt = now + (6 + Math.floor(Math.random() * 5)) * 60000;
+    if (c.virusInfected > 0 && Math.random() < 0.20){
+      const loss = 0.10 + Math.random() * 0.10;
+      c.virusInfected = Math.max(0, Math.floor(c.virusInfected * (1 - loss)));
+      c.virusRate = Math.max(0, c.virusRate * (1 - loss));
+      c.burnAlert = true;
+      Core.note(`СЕТЬ СГОРЕЛА · -${Math.round(loss * 100)}% VIRUS\nдокупи сеть: virus`, 'warn', 8000);
+      Core.save();
+    }
   }
-  out('');
-  out('  learn <phish|social|hack|bribe> — потратить очко', 'dim');
-  out('');
-}
 
-function cmdLearn(c, q){
-  q = String(q || '').toLowerCase();
-  if (!METHOD_NAMES[q]){ out('learn phish|social|hack|bribe', 'err'); return; }
-  if (c.sp < 1){ out('нет свободных очков. они даются за успешные операции.', 'err'); return; }
-  c.sp--;
-  c.skills[q]++;
-  out(`[+] ${METHOD_NAMES[q]} → ур.${c.skills[q]} · осталось очков: ${c.sp}`, 'ok');
-  Core.save();
-}
-
-function cmdLeek(c){
-  out('cyber_leek', 'head');
-  if (c.trust >= 75) out('  «ты держишься. я вижу. продолжай в том же духе.»', '');
-  else if (c.trust >= 50) out('  «не спеши. чистая работа важнее громкой. я рядом.»', '');
-  else out('  «я не прошу быть святым. прошу не превращаться в них.»', '');
-  out('');
-  out('  он не отвечает мгновенно. письма приходят в mail.', 'dim');
-  out('');
-}
-
-function method(c, id){
-  const op = c.op;
-  if (!op || op.step !== 'access'){ out('сейчас не шаг доступа. jobs — статус.', 'dim'); return; }
-  const t = targetById(op.id);
-  if (!t) return;
-  if (id === 'social'){
-    Core.clearConsole();
-    out('СОЦ. ИНЖЕНЕРИЯ · выбери реплику', 'head');
-    out('');
-    out('  1) «Здравствуйте, я из службы безопасности банка. Нужно уточнить платёж.»', '');
-    out('  2) «Извините, я ошибся номером. Раз вы ответили — у вас есть минута?»', '');
-    out('  3) «Откройте доступ. Иначе пожалеете.»', '');
-    out('');
-    socialPick = true;
-    Core.setTask('social: выбери 1, 2 или 3');
+  // побочные заказы истекают
+  if (c.sideCase && c.sideCase.expires && now >= c.sideCase.expires){
+    c.sideCase = null;
+    Core.note('побочный заказ исчез', 'dim', 6000);
     Core.save();
-    return;
   }
-  let cost = 0, chance = 0, label = METHOD_NAMES[id] || id;
-  if (id === 'phish'){
-    chance = 0.72 + c.skills.phish * 0.05 - (t.stars - 1) * 0.05 - (op.hardened ? 0.10 : 0);
-  } else if (id === 'hack'){
-    cost = Math.max(120, 150 + t.stars * 80 - c.skills.hack * 15);
-    chance = 0.86 + c.skills.hack * 0.03 - (t.stars - 1) * 0.04 - (op.hardened ? 0.06 : 0);
-  } else if (id === 'bribe'){
-    cost = Math.max(220, 300 + t.stars * 100 - c.skills.bribe * 20);
-    chance = 0.95 + c.skills.bribe * 0.01;
-  } else {
-    out('метод: phish | social | hack | bribe', 'err');
-    return;
+  if (c.darknet.hot && c.darknet.hot.expires < now){
+    c.darknet.hot = null;
+    Core.note('горячий заказ истёк', 'dim', 6000);
+    Core.save();
   }
-  if (cost > 0) cost = Math.round(cost * (1 + 0.25 * (c.extra[t.id] || 0)));
-  if (cost > 0 && state().money < cost){ out(`нужно $${fmt(cost)} на ${label}. не хватает $${fmt(cost - state().money)}.`, 'err'); return; }
-  if (cost > 0) state().money -= cost;
-  out('');
-  out(`> ${label}${cost ? ' · -$' + fmt(cost) : ''}`, 'dim');
-  if (Math.random() < clamp(chance, 0.15, 0.98)){
-    op.progress = Math.min(100, op.progress + 30);
-    op.step = 'search';
-    op.hardened = false;
-    out('> доступ получен. цель пока ничего не поняла.', 'ok');
-    out('');
-    out('  шаг 2: что копируем?', '');
-    out('  copy accounts · messages · evidence · all', 'dim');
-    Core.setTask(`операция: ${t.name} · поиск данных (copy ...)`);
-  } else {
-    accessFail(c, op, t, label);
-  }
-  Core.save();
+  dnRoll(c);
+  if (c.case) setTaskFor(c);
 }
 
-function resolveSocial(pick){
-  socialPick = false;
-  const s = state();
-  const c = ensure();
-  if (!s || !c || !c.op){ return; }
-  const op = c.op;
-  const t = targetById(op.id);
-  if (!t) return;
-  const chance = (pick === '2' ? 0.90 : pick === '1' ? 0.55 : 0.18) + c.skills.social * 0.05;
-  if (pick === '2') out('> «Конечно, спрашивайте.» — голос на другом конце устал, но не подозревает.', '');
-  else if (pick === '1') out('> «Служба безопасности? У меня нет счетов в этом банке.» — пауза слишком длинная.', '');
-  else out('> «Кто вы вообще такой?» — трубка замолкает.', 'dim');
-  if (Math.random() < clamp(chance, 0.1, 0.97)){
-    op.progress = Math.min(100, op.progress + 30);
-    op.step = 'search';
-    op.hardened = false;
-    out('> контакт сработал. доступ есть.', 'ok');
-    out('');
-    out('  шаг 2: что копируем?', '');
-    out('  copy accounts · messages · evidence · all', 'dim');
-    Core.setTask(`операция: ${t.name} · поиск данных (copy ...)`);
-  } else {
-    accessFail(c, op, t, 'social');
-  }
-  Core.save();
-}
+/* ---------- экспорт ---------- */
 
-function accessFail(c, op, t, label){
-  op.fails++;
-  op.hardened = true;
-  op.progress = Math.max(0, op.progress - 10);
-  op.risk = Math.min(100, op.risk + 10);
-  out(`> ${label}: цель насторожилась. защита усилена.`, 'err');
-  if (op.fails >= 3){
-    targetFled(c, t, 'доступ не удался');
-    return;
-  }
-  out('  попробуй другой метод или cover, чтобы сбить след.', 'dim');
-  out('');
-}
-
-function cmdCopy(c, kind){
-  const op = c.op;
-  if (!op || op.step !== 'search'){ out('сейчас не шаг поиска. jobs — статус.', 'dim'); return; }
-  const t = targetById(op.id);
-  if (!t) return;
-  kind = String(kind || '').toLowerCase();
-  if (!['accounts', 'messages', 'evidence', 'all'].includes(kind)){
-    out('copy accounts|messages|evidence|all', 'err');
-    return;
-  }
-  const all = kind === 'all';
-  const chance = clamp(0.84 - op.risk / 500 - (all ? 0.16 : 0) + (kind === t.need ? 0.06 : 0), 0.25, 0.95);
-  out('');
-  out(`> копирую: ${kind === 'all' ? 'всё сразу' : kind}${all ? ' · дольше и рискованнее' : ''}`, 'dim');
-  if (Math.random() < chance){
-    op.progress = Math.min(100, op.progress + (all ? 55 : 35));
-    op.risk = Math.min(100, op.risk + (all ? 10 : 4));
-    op.step = 'leak';
-    out('> данные у тебя. след пока холодный.', 'ok');
-    out('');
-    out('  шаг 3: кому слить?', '');
-    out('  leak press · leak police · leak leek · sell', 'dim');
-    Core.setTask(`операция: ${t.name} · слив (leak ... / sell)`);
-  } else {
-    op.fails++;
-    op.risk = Math.min(100, op.risk + 12);
-    op.progress = Math.max(0, op.progress - 10);
-    out('> цель заметила копирование. защита усложнилась.', 'err');
-    if (op.fails >= 3){ targetFled(c, t, 'копирование сорвалось'); Core.save(); return; }
-    out('  попробуй другой набор или cover.', 'dim');
-    out('');
-  }
-  Core.save();
-}
-
-function cmdLeak(c, kind){
-  const op = c.op;
-  if (!op || op.step !== 'leak'){ out('сейчас не шаг слива. jobs — статус.', 'dim'); return; }
-  const t = targetById(op.id);
-  if (!t) return;
-  kind = String(kind || '').toLowerCase();
-  if (kind !== 'press' && kind !== 'police' && kind !== 'leek' && kind !== 'sell'){
-    out('leak press|police|leek · sell', 'err');
-    return;
-  }
-  let chance = kind === 'police' ? 0.86 : kind === 'press' ? 0.76 : kind === 'sell' ? 0.88 : 0.90;
-  chance = clamp(chance - op.risk / 500, 0.3, 0.96);
-  out('');
-  if (Math.random() >= chance){
-    targetFled(c, t, 'слив провалился');
-    return;
-  }
-  const base = Math.round(t.reward * (0.78 + c.trust / 250));
-  let grant = base, dTrust = t.trust, line = '';
-  if (kind === 'police'){ grant = Math.round(base * 0.8); dTrust = t.trust + 2; line = 'дело ушло в следствие. тихо, но надолго.'; }
-  else if (kind === 'press'){ grant = base; dTrust = t.trust; line = 'журналисты подхватили. громко — цель может уйти.'; }
-  else if (kind === 'leek'){ grant = Math.round(base * 0.7); dTrust = t.trust + 3; line = 'cyber_leek забрал данные. он решит, что с ними делать.'; }
-  else { grant = Math.round(base * 1.8); dTrust = -Math.max(3, Math.round(t.trust * 0.8)); line = 'ты продал данные на сторону. деньги есть. доверие — нет.'; }
-  grant = Math.max(500, Math.round(grant));
-
-  state().money += grant;
-  c.trust = clamp(c.trust + dTrust, 0, 100);
-  c.done++;
-  c.sp++;
-  c.completed.push(t.id);
-  c.op = null;
-  out(`[ОПЕРАЦИЯ] ${t.name} — закрыта.`, 'ok');
-  out(`  ${line}`, 'dim');
-  out(`  +$${fmt(grant)} · trust ${dTrust >= 0 ? '+' : ''}${dTrust} · операций: ${c.done}`, '');
-  out('');
-  mailAfter(c, t, kind, grant);
-  if (c.done === 3){
-    Core.addMail({
-      id:'c2story3' + Date.now(), from:'cyber_leek', subject:'они уже рядом',
-      body:'три операции. ты начал понимать, как это работает.\nОНИ тоже начали понимать, что кто-то чистит их людей.\nне расслабляйся. и не думай, что ты герой.',
-      read:false
-    });
-  }
-  if (c.done === 5){
-    Core.addMail({
-      id:'c2story5' + Date.now(), from:'cyber_leek', subject:'последний шаг',
-      body:'ещё одна цель — и я скажу тебе то, что не говорил никому.\nпосле этого решай сам, остаёшься ты или уходишь.\nя не буду держать.',
-      read:false
-    });
-  }
-  if (c.done >= 6 && !c.finalOffered) offerFinal(c);
-  Core.setTask('выбери цель: targets');
-  Core.save();
-  Core.updateBadges();
-}
-
-function targetFled(c, t, why){
-  c.op = null;
-  c.trust = Math.max(0, c.trust - 2);
-  c.closed[t.id] = Date.now() + 120000;
-  c.extra[t.id] = (c.extra[t.id] || 0) + 1;
-  out(`[ПРОВАЛ] ${t.name} ушла в тень. ${why}.`, 'err');
-  out('  вернётся через 2 минуты. повтор будет дороже.', 'dim');
-  out('');
-  Core.setTask('выбери цель: targets');
-  Core.save();
-}
-
-function mailAfter(c, t, kind, grant){
-  const subjects = {
-    press: 'шум в прессе',
-    police: 'передано в следствие',
-    leek: 'работа принята',
-    sell: 'это был не тот выбор'
-  };
-  const bodies = {
-    press: `«${t.name}» в новостях. журналисты копают. громко, но цель могла уйти.`,
-    police: `«${t.name}» передан в следствие. тихо. иногда это лучше громких заголовков.`,
-    leek: `«${t.name}» — чисто. я видел, как ты сделал это. продолжай.`,
-    sell: `ты продал «${t.name}» на сторону. деньги твои. только не говори, что это была чистая работа.`
-  };
-  Core.addMail({
-    id: 'c2m' + Date.now() + '-' + c.done,
-    from: 'cyber_leek',
-    subject: subjects[kind] || 'отчёт',
-    body: (bodies[kind] || 'работа закрыта.') + `\nгрант: $${fmt(grant)}.`,
-    read: false
-  });
-}
-
-function offerFinal(c){
-  c.finalOffered = true;
-  Core.addMail({
-    id: 'c2final' + Date.now(),
-    from: 'cyber_leek',
-    subject: 'последнее дело',
-    body: 'шесть целей позади. ты больше не тот, кто сидел в гараже и слушал unknown.\nя могу дать тебе новую личность и тихую работу до конца жизни.\nили ты можешь уйти своим путём. я не буду держать.\nнапиши: stay или leave.',
-    read: false
-  });
-}
-
-function cmdCover(c){
-  if (!c.op){ out('нечего заметать. активной операции нет.', 'dim'); return; }
-  if (state().money < 250){ out('cover стоит $250. не хватает.', 'err'); return; }
-  state().money -= 250;
-  c.op.risk = Math.max(0, c.op.risk - 20);
-  c.op.progress = Math.min(100, c.op.progress + 5);
-  out('[COVER] следы подчищены · -$250 · риск -20%', 'ok');
-  Core.save();
-  Core.updateBadges();
-}
-
-/* ---------- сеть: задания ---------- */
-
-function netMenu(c){
-  out('ПОМОЩЬ СЕТИ · cyber_leek', 'head');
-  out('  мелкие задания информаторов: +1–3 trust и немного денег.', 'dim');
-  out('');
-  if (c.netJob){
-    const job = c.netJob;
-    const p = clamp((Date.now() - (job.startedAt || Date.now())) / (job.duration * 1000), 0, 1);
-    out(`  выполняется: ${job.title}`, '');
-    out(`  ${bar(p)} ${Math.floor(p * 100)}%`, 'dim');
-    out('');
-    return;
-  }
-  for (const verb of ['scan', 'check', 'confirm']){
-    const t = c.netTasks[verb];
-    out(`  net ${verb.padEnd(7)} ${t.title}`, '');
-    out(`             +${t.trust} trust · $${t.money} · ~${t.duration}с`, 'dim');
-  }
-  out('');
-  out('  net scan | net check | net confirm — взять задание', 'dim');
-  out('');
-}
-
-function startNet(c, verb){
-  if (c.ended){ out('история завершена.', 'dim'); return; }
-  if (c.netJob){ out('сначала дождись текущего задания сети. jobs — статус.', 'dim'); return; }
-  const task = c.netTasks[verb];
-  if (!task){ out('net scan | net check | net confirm', 'err'); return; }
-  c.netJob = Object.assign({}, task, { startedAt: Date.now() });
-  out('');
-  out(`[NET] ${task.title}`, '');
-  netLineEl = Core.out('', 'job');
-  Core.setTask(`сеть: ${task.title}`);
-  Core.save();
-  netTick(c);
-}
-
-function netTick(c){
-  const job = c.netJob;
-  if (!job) return;
-  if (!job.startedAt) job.startedAt = Date.now();
-  if (!netLineEl || !netLineEl.isConnected) netLineEl = Core.out('', 'job');
-  const p = clamp((Date.now() - job.startedAt) / (job.duration * 1000), 0, 1);
-  if (netLineEl) netLineEl.textContent = `  ${job.title} ${bar(p)} ${Math.floor(p * 100)}%`;
-  if (p >= 1) finishNet(c, job);
-}
-
-function finishNet(c, job){
-  const s = state();
-  s.money += job.money;
-  c.trust = clamp(c.trust + job.trust, 0, 100);
-  c.netDone = (c.netDone || 0) + 1;
-  c.netTasks[job.verb] = makeNetTask(job.verb, c);
-  c.netJob = null;
-  if (netLineEl){
-    netLineEl.className = 'line ok';
-    netLineEl.textContent = `  [+] ${job.title} · +${job.trust} trust · +$${fmt(job.money)}`;
-    netLineEl = null;
-  }
-  out(`[NET] готово · доверие ${Math.round(c.trust)} · деньги $${fmt(s.money)}`, 'dim');
-  out('');
-  Core.setTask('сеть: net · цели: targets');
-  Core.save();
-  Core.updateBadges();
-}
-
-function cmdNet(c, arg){
-  const verb = String(arg || '').toLowerCase();
-  if (!verb){ netMenu(c); return; }
-  if (verb !== 'scan' && verb !== 'check' && verb !== 'confirm'){
-    out('net scan | net check | net confirm', 'dim');
-    return;
-  }
-  startNet(c, verb);
-}
-
-function cmdStatus(c){
-  out('СИСТЕМА · ГЛАВА 2', 'head');
-  out('  локация   ТИХАЯ КОМНАТА', '');
-  out(`  деньги    $${fmt(state().money)}`, '');
-  out(`  доверие   ${Math.round(c.trust)} / 100`, '');
-  out(`  операции  ${c.done}`, '');
-  out(`  навыки    очков ${c.sp}`, 'dim');
-  if (c.op) out(`  текущая   ${targetById(c.op.id)?.name || '—'} · ${stepName(c.op)} · ${c.op.progress}%`, '');
-  else out('  текущая   нет', 'dim');
-  if (c.netJob) out(`  сеть      ${c.netJob.title}`, '');
-  out('');
-}
-
-function cmdStay(c){
-  if (!c.finalOffered || c.ended){ out('сейчас это не решение.', 'dim'); return; }
-  c.ended = true;
-  Core.clearConsole();
-  Core.setTask('');
-  out('ТЫ ОСТАЁШЬСЯ', 'head');
-  out('');
-  out('  cyber_leek даёт тебе новую личность и новую тихую работу.', '');
-  out('  ты больше не будешь один. но и свободы станет меньше.', 'dim');
-  out('');
-  out('  конец главы 2. продолжение — в следующем обновлении.', 'dim');
-  out('');
-  Core.save();
-}
-
-function cmdLeave(c){
-  if (!c.finalOffered || c.ended){ out('сейчас это не решение.', 'dim'); return; }
-  c.ended = true;
-  Core.clearConsole();
-  Core.setTask('');
-  out('ТЫ УХОДИШЬ', 'head');
-  out('');
-  out('  ты забираешь свои данные и уходишь в холод.', '');
-  out('  cyber_leek не пытается тебя остановить. он просто кивает.', 'dim');
-  out('');
-  out('  конец главы 2. продолжение — в следующем обновлении.', 'dim');
-  out('');
-  Core.save();
-}
-
-/* ---------- админ-переключение ---------- */
-
-function adminExit(){
-  pendingEscape = false;
-  socialPick = false;
-  netLineEl = null;
-  const old = state();
-  const nick = old.nick || Core.readNick();
-  const next = Core.newState();
-  next.started = true;
-  next.nick = nick;
-  next.money = 1000;
-  next.earned = 1000;
-  next.story = 1;
-  next.tutorialDone = true;
-  next.tutorialStep = 8;
-  next.chapter2 = false;
-  Core.setState(next);
-  Core.clearConsole();
-  Core.updatePrompt();
-  Core.renderHUD();
-  Core.hideHints();
-  Core.setTask('');
-  out('ГЛАВА 1 · ПЕСОЧНИЦА', 'head');
-  out('  гараж · $1000 · прогресс главы 2 сброшен', '');
-  out('  admin earned <n> — поднять заработок для писем главы 2', 'dim');
-  out('  admin chapter 2 — перейти в главу 2 заново', 'dim');
-  out('');
-  Core.focusInput();
-  Core.save();
-}
-
-/* ---------- диспетчер ---------- */
-
-function handle(cmd, args, line){
-  const s = state();
-  if (!s) return false;
-
-  if (!s.chapter2){
-    if (s.finished === 'prison' && cmd === 'start'){
-      prisonEnding();
-      return true;
-    }
-    if (pendingEscape){
-      if (cmd === '1' || cmd === 'сбежать' || cmd === 'escape'){ pendingEscape = false; escapeEnding(); return true; }
-      if (cmd === '2' || cmd === 'остаться' || cmd === 'ignore'){ pendingEscape = false; prisonEnding(); return true; }
-    }
-    if (cmd === 'open' && String(args[0] || '').toLowerCase() === 'data.txt'){
-      openData();
-      return true;
-    }
-    return false;
-  }
-
-  const c = ensure();
-  if (!c) return false;
-
-  if (socialPick){
-    if (cmd === '1' || cmd === '2' || cmd === '3'){
-      resolveSocial(cmd);
-    } else {
-      out('выбери реплику: 1, 2 или 3.', 'dim');
-    }
-    return true;
-  }
-  if (pendingEscape){
-    if (cmd === '1'){ pendingEscape = false; escapeEnding(); return true; }
-    if (cmd === '2'){ pendingEscape = false; prisonEnding(); return true; }
-  }
-
-  switch(cmd){
-    case 'targets': cmdTargets(c); return true;
-    case 'dossier': {
-      const t = targetById(args[0]);
-      if (!t){ out('dossier <id>. targets — список.', 'err'); return true; }
-      cmdDossier(t);
-      return true;
-    }
-    case 'op': cmdOp(c, args[0]); return true;
-    case 'jobs': cmdJobs(c); return true;
-    case 'status': cmdStatus(c); return true;
-    case 'trust': cmdTrust(c); return true;
-    case 'net': cmdNet(c, args[0]); return true;
-    case 'skills': cmdSkills(c); return true;
-    case 'learn': cmdLearn(c, args[0]); return true;
-    case 'leek': cmdLeek(c); return true;
-    case 'cover': cmdCover(c); return true;
-    case 'phish': case 'social': case 'bribe':
-      method(c, cmd); return true;
-    case 'hack':
-      method(c, 'hack'); return true;
-    case 'copy':
-      cmdCopy(c, args[0]); return true;
-    case 'accounts': case 'messages': case 'evidence':
-      cmdCopy(c, cmd); return true;
-    case 'leak':
-      cmdLeak(c, args[0]); return true;
-    case 'sell':
-      cmdLeak(c, 'sell'); return true;
-    case 'stay': cmdStay(c); return true;
-    case 'leave': cmdLeave(c); return true;
-    case 'help': case 'hints':
-      help(); return true;
-    case 'shop': case 'farm': case 'rig': case 'buy': case 'team': case 'move': case 'cool':
-      out('в главе 2 этой механики нет. help — список команд.', 'dim');
-      return true;
-    case 'open':
-      out('открыть можно только вложение из почты. mail — список.', 'dim');
-      return true;
-    case 'mail':
-      return false;
-    default:
-      return false;
-  }
-}
-
-window.GarageChapter2 = {
+window.R00TKITChapter2 = {
+  createState,
+  normalizeState: ensureState,
   handle,
-  tick(){ const c = ensure(); if (c) netTick(c); },
-  tickChapter1,
+  tick,
   menu,
   start,
-  adminEnter: () => enterChapter2(),
-  adminExit
+  introCutscene,
+  escapeToChapter2,
+  openData: () => openData(),
+  mailUnread: () => { const c = ensure(); return !!(c && c.mail.items.some(m => !m.read)); },
+  hasSp: () => { const c = ensure(); return !!(c && c.sp > 0); },
+  burnAlert: () => { const c = ensure(); return !!(c && c.burnAlert); },
+  hotActive: () => { const c = ensure(); return !!(c && c.darknet && c.darknet.hot); },
+  resetMail: () => { mailLock = null; if (mailTimer){ clearTimeout(mailTimer); mailTimer = null; } unbindMailKey(); pendingEscape = false; socialPick = false; }
 };
 })();
