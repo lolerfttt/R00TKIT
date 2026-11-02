@@ -98,22 +98,21 @@ const CUTSCENE = [
   ['hacker', 'Хорошо. Тогда первое правило: не геройствуй. Герои здесь долго не живут.']
 ];
 
-const DN_NAMES = ['Виктор Ланской','Олег Круг','Марина Соболь','Аркадий Лис','Сергей Волк','Алиса Ветрова','Дмитрий Ким','Роман Барс'];
 const DN_NICKS = ['ghost_77','nullbyte','kira.exe','m4x','v0id','rootcat','n3on','saint'];
 const DN_SITES = ['bank-ural.ru','crypto-pay.io','forum.n3x','market.dark','login-secure.tk','pastebin.cc','cloud-dump.net'];
 const DN_ORGS = ['банк «Урал»','картель «Ночь»','фонд «Доверие»','портал «Сеть»','логистика «Восток»'];
 
 const DARKNET = {
-  names: DN_NAMES, nicks: DN_NICKS, sites: DN_SITES, orgs: DN_ORGS,
+  nicks: DN_NICKS, sites: DN_SITES, orgs: DN_ORGS,
   offers: [
-    'снять копию профиля {name}',
-    'проверить утечку {site}',
-    'подтвердить личность {name}',
-    'найти след {nick} в {site}',
-    'сверить базу {org}',
-    'проверить адрес {name}',
-    'вытащить переписку {nick}',
-    'подтвердить слив {site}'
+    'утечка {site}',
+    'профиль {nick}',
+    'переписка {nick}',
+    'кошелёк {nick}',
+    'данные {org}',
+    'адрес склада {nick}',
+    'след {nick} в {site}',
+    'слив {site}'
   ],
   hot: [
     { text:'слить бэкап казино, пока не сменили ключи', need:40, reward:4, minutes:7 },

@@ -259,6 +259,7 @@ let choiceCanClose = false;
 let choiceCloseTimer = null;
 
 const cutscene = { active:false, token:0, nickTimer:null };
+let cutSkip = false;
 /* ─── СКОРОСТЬ КАТСЦЕНЫ ─── */
 const CUT_WPM = 500; // слов в минуту: больше — быстрее, меньше — медленнее
 let adminUnlocked = false;
@@ -1324,13 +1325,16 @@ function renderHUD(){
   if (!booted) return;
   if (RUN.chapter === 2){
     const c = S || {};
-    const rate = Number(c.virusRate) || 0;
+    const rate = (Number(c.virusRate) || 0) * (c.tutorial && !c.tutorial.done ? 5 : 1);
+    const points = Number(c.virusPoints) || 0;
     const t = c.case;
     const p = t ? clamp((Number(t.progress) || 0) / (Number(t.need) || 1), 0, 1) : 0;
+    const filled = Math.round(p * 10);
+    const infoBar = '[' + '|'.repeat(filled) + '.'.repeat(10 - filled) + ']';
     $('h-loc').textContent = 'N3X: ' + (Number(c.n3x) || 0).toFixed(1);
-    $('h-money').textContent = 'Points: ' + (Number(c.sp) || 0);
-    $('h-inc').textContent = 'VIRUS: ' + (Number(c.virusInfected) || 0) + ' / +' + rate.toFixed(2) + ' points/s';
-    $('h-lvl').textContent = t ? `info ${bar(p, 14)} ${Math.floor(t.progress)}/${t.need}` : 'info [--------------] —';
+    $('h-money').textContent = 'SP: ' + (Number(c.sp) || 0);
+    $('h-inc').textContent = 'VIRUS: ' + points.toFixed(1) + '/100 (+' + rate.toFixed(1) + '/с) · ' + (Number(c.virusInfected) || 0) + ' ПК';
+    $('h-lvl').textContent = t ? `ИНФО ${infoBar} ${Math.floor(t.progress)}/${t.need}` : 'ИНФО [..........] —';
     $('h-xp').textContent = '';
     $('h-heat').textContent = '';
     $('h-heat').classList.remove('hot');
@@ -1947,7 +1951,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v2.0'),
+  artLine('prod by 3percent · v2.1'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
@@ -2142,6 +2146,7 @@ function cutAlive(token){
 
 function beginCutscene(){
   cutscene.active = true;
+  cutSkip = false;
   cutscene.token++;
   input.disabled = true;
   input.blur();
@@ -2152,6 +2157,7 @@ function beginCutscene(){
 function finishCutscene(token){
   if (token != null && cutscene.token !== token) return false;
   cutscene.active = false;
+  cutSkip = false;
   stopNickGlitch();
   document.body.classList.remove('cutscene', 'cut-flicker');
   input.disabled = false;
@@ -2191,6 +2197,14 @@ function scheduleNickGlitch(token){
   cutscene.nickTimer = setTimeout(step, 1100 + Math.random() * 500);
 }
 
+async function cutPause(ms){
+  const end = performance.now() + ms;
+  while (performance.now() < end){
+    if (cutSkip){ cutSkip = false; return; }
+    await sleep(40);
+  }
+}
+
 async function cutLine(who, text, token, cls = '', name = ''){
   if (!cutAlive(token)) return;
   const d = document.createElement('div');
@@ -2209,8 +2223,15 @@ async function cutLine(who, text, token, cls = '', name = ''){
   logEl.appendChild(d);
   scrollBottom(true);
   const base = 60000 / (CUT_WPM * 5); // мс на символ при средней длине слова 5 букв
+  let skippedLine = false;
   for (const ch of text){
     if (!cutAlive(token)) return;
+    if (cutSkip){
+      body.textContent = text;
+      cutSkip = false;
+      skippedLine = true;
+      break;
+    }
     body.textContent += ch;
     scrollBottom(true);
     if (window.R00TKITSound && window.R00TKITSound.type) window.R00TKITSound.type(ch);
@@ -2221,10 +2242,19 @@ async function cutLine(who, text, token, cls = '', name = ''){
     if (Math.random() < 0.035) delay += base * (1.5 + Math.random() * 2.6);
     await sleep(delay);
   }
-  await sleep(800 + Math.random() * 700);
+  await cutPause(skippedLine ? 80 : 800 + Math.random() * 700);
 }
 
+document.addEventListener('keydown', e => {
+  if (!cutscene.active || choiceMode !== null) return;
+  if (e.code === 'Space' || e.key === ' '){
+    e.preventDefault();
+    cutSkip = true;
+  }
+}, true);
+
 async function storyRun(token){
+  cutSkip = false;
   clearConsole();
   await sleep(3000);
   if (!cutAlive(token)) return;
@@ -2326,6 +2356,7 @@ function startStory(force = false){
   storyRun(token).catch(() => {}).finally(() => {
     if (cutscene.token !== token) return;
     cutscene.active = false;
+    cutSkip = false;
     stopNickGlitch();
     document.body.classList.remove('cutscene', 'cut-flicker');
     music('gameplay');
@@ -3089,7 +3120,7 @@ function cmdAdmin2(a, raw, n, args){
     case 'sp':
       if (!isFinite(n)){ out('admin sp <n>', 'err'); return; }
       c.sp = Math.max(0, Math.floor(n));
-      out(`[ADMIN] Points: ${c.sp}`, 'ok');
+      out(`[ADMIN] SP: ${c.sp}`, 'ok');
       break;
     case 'virus': {
       const pc = parseInt(raw, 10);
