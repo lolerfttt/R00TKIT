@@ -1954,7 +1954,7 @@ const ART = [
   artLine(''),
   artLine('R 0 0 T K I T'),
   artLine(''),
-  artLine('prod by 3percent · v2.3'),
+  artLine('prod by 3percent · v2.4'),
   artLine(''),
   '╚' + '═'.repeat(ART_W) + '╝'
 ].join('\n');
