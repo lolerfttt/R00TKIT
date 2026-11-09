@@ -88,7 +88,7 @@
 
   function send(final){
     const snap = snapshot();
-    if (!snap) return;
+    if (!snap) return Promise.resolve('no state');
     const sessionSec = Math.max(0, (Date.now() - startedAt) / 1000);
     const totalSec = baseTotal + sessionSec;
     const body = JSON.stringify({
@@ -101,21 +101,30 @@
       visits,
       ua: String(navigator.userAgent || '').slice(0, 180)
     });
-    try {
-      if (navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }))){
-        persistTotal();
-        return;
-      }
-      fetch(ENDPOINT, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body,
-        keepalive: true
-      }).catch(() => {});
-    } catch (e) {}
     persistTotal();
+
+    if (final && navigator.sendBeacon){
+      try {
+        if (navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }))){
+          return Promise.resolve('beacon');
+        }
+      } catch (e) {}
+    }
+
+    return fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body,
+      keepalive: true
+    }).then(r => r.text()).catch(() => {
+      try {
+        if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+      } catch (e) {}
+      return 'beacon';
+    });
   }
+
+  window.R00TKITTelemetry = { send: () => send(false), snapshot };
 
   setTimeout(() => send(false), 8000);
   setInterval(() => send(false), 60000);
