@@ -3,7 +3,7 @@
 
   // Вставь сюда URL веб-приложения Google Apps Script.
   // Пока строка пустая — телеметрия полностью отключена.
-  const ENDPOINT = '';
+  const ENDPOINT = 'https://script.google.com/macros/s/AKfycbzyIcxXezsblKuSfv4_IMAWWRyjlmO2Kfb0F0g72sP-mS4-Qd2xlV9__iQPZd4-HrMY6g/exec';
 
   if (!ENDPOINT) return;
   if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
